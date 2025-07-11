@@ -89,8 +89,6 @@ app.post('/api/analyze', async (req, res) => {
         // Step 1: Generate SFDX Project
         await executeCommand(`sf project generate --name salesforce-project`, { cwd: sessionPath });
 
-        const projectPath = path.join(sessionPath, 'salesforce-project');
-
         // Step 2: Authenticate using SF_ACCESS_TOKEN
         const loginCommand = `sf org login access-token --instance-url ${instanceUrl} --no-prompt --alias ${sessionId}`;
         await executeCommand(loginCommand, {
@@ -101,16 +99,34 @@ app.post('/api/analyze', async (req, res) => {
             }
         });
 
-        // ✅ Step 3: Generate manifest from org metadata (only required types)
+        // Step 3: Create manifest directory and generate manifest
+        const manifestDir = path.join(projectPath, 'manifest');
+        await fs.ensureDir(manifestDir);
+        
         const manifestCmd = `sf project generate manifest --from-org ${sessionId} --metadata ApexClass,ApexTrigger,LightningComponentBundle,AuraDefinitionBundle`;
         await executeCommand(manifestCmd, { cwd: projectPath });
 
-        // ✅ Step 4: Retrieve metadata using generated manifest
+        // Step 4: Verify manifest exists before retrieving
+        const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
+        const manifestExists = await fs.pathExists(manifestPath);
+        
+        if (!manifestExists) {
+            throw new Error(`Manifest file not found at ${manifestPath}. The org might not have the specified metadata types.`);
+        }
+
+        // Step 5: Retrieve metadata using generated manifest
         const retrieveCmd = `sf project retrieve start --manifest manifest/package.xml --target-org ${sessionId}`;
         await executeCommand(retrieveCmd, { cwd: projectPath });
 
-        // ✅ Step 5: Run scanner
-        const reportPath = path.join(__dirname, 'reports', `CodeAnalyzerResults_${sessionId}.html`);
+        // Step 6: Verify force-app directory exists before scanning
+        const forceAppPath = path.join(projectPath, 'force-app');
+        const forceAppExists = await fs.pathExists(forceAppPath);
+        
+        if (!forceAppExists) {
+            throw new Error('No metadata retrieved. The org might not contain the specified metadata types.');
+        }
+
+        // Step 7: Run scanner
         const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app --projectdir force-app`;
         await executeCommand(scanCmd, { cwd: projectPath });
 
@@ -135,6 +151,15 @@ app.post('/api/analyze', async (req, res) => {
         });
 
     } catch (err) {
+        // Clean up on error
+        try {
+            if (await fs.pathExists(sessionPath)) {
+                await fs.remove(sessionPath);
+            }
+        } catch (cleanupError) {
+            console.error('Error during cleanup:', cleanupError);
+        }
+
         res.status(500).json({
             success: false,
             message: 'Analyzer failed',
