@@ -1,96 +1,75 @@
-const express = require('express');
-const cors = require('cors');
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+let currentSessionId = '';
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public')); // Serve index.html and related files from /public
+function showStatus(id, message, type = 'info') {
+  document.getElementById(id).innerHTML = `<div class="status ${type}">${message}</div>`;
+}
 
-// Login with Salesforce CLI (web)
-app.post('/api/login', (req, res) => {
-    const { env } = req.body; // 'prod' or 'sandbox'
-    const alias = env === 'prod' ? 'prod-org' : 'sandbox-org';
+function showStep(stepNum) {
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById(`step${i}`).classList.add('hidden');
+  }
+  document.getElementById(`step${stepNum}`).classList.remove('hidden');
+}
 
-    const command = env === 'prod'
-        ? `sf org login web --alias ${alias}`
-        : `sf org login web --alias ${alias} --instance-url https://test.salesforce.com`;
+async function loginHardcoded() {
+  showStatus('loginStatus', 'Authenticating...', 'loading');
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            return res.status(500).json({ success: false, message: stderr });
-        }
-        return res.json({ success: true, message: stdout });
+  try {
+    const response = await fetch('/api/manual-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
     });
-});
 
-// Get Access Token and Org Info
-app.post('/api/token', (req, res) => {
-    const { alias } = req.body;
+    const result = await response.json();
 
-    exec(`sf org display --target-org ${alias} --verbose`, (err, stdout, stderr) => {
-        if (err) {
-            return res.status(500).json({ success: false, message: stderr });
-        }
-
-        // Optionally parse token details
-        return res.json({ success: true, output: stdout });
-    });
-});
-
-// Retrieve Metadata API
-app.post('/api/retrieve', (req, res) => {
-    const { alias, packageXml } = req.body;
-    const tempDir = path.join(__dirname, 'tmp', alias);
-
-    if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
+    if (result.success) {
+      currentSessionId = result.sessionId;
+      showStatus('loginStatus', `✅ Authenticated! Session ID: ${currentSessionId}`, 'success');
+      showStep(2);
+    } else {
+      showStatus('loginStatus', `❌ Login failed: ${result.message}`, 'error');
     }
+  } catch (error) {
+    showStatus('loginStatus', `❌ Error: ${error.message}`, 'error');
+  }
+}
 
-    // Save package.xml
-    fs.writeFileSync(path.join(tempDir, 'package.xml'), packageXml);
+async function runFullScan() {
+  showStatus('scanStatus', 'Running full scan: retrieving metadata & analyzing...', 'loading');
 
-    const command = `sf project retrieve start --manifest ${path.join(tempDir, 'package.xml')} --target-org ${alias} --output-dir ${tempDir}/retrieved`;
+  if (!currentSessionId) {
+    showStatus('scanStatus', 'Session ID missing. Please login first.', 'error');
+    return;
+  }
 
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            return res.status(500).json({ success: false, message: stderr });
-        }
-        return res.json({ success: true, message: stdout });
+  try {
+    const response = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: currentSessionId })
     });
-});
 
-// Run Code Analyzer
-app.post('/api/analyze', (req, res) => {
-    const { alias } = req.body;
-    const scanPath = path.join(__dirname, 'tmp', alias, 'retrieved');
+    const result = await response.json();
 
-    const command = `sf scanner run --target ${scanPath} --format html --outfile ${scanPath}/report.html`;
-
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            return res.status(500).json({ success: false, message: stderr });
-        }
-        return res.json({ success: true, message: stdout });
-    });
-});
-
-// Serve Analysis Report
-app.get('/api/report/:alias', (req, res) => {
-    const { alias } = req.params;
-    const reportPath = path.join(__dirname, 'tmp', alias, 'retrieved', 'report.html');
-
-    if (!fs.existsSync(reportPath)) {
-        return res.status(404).send('Report not found');
+    if (result.success) {
+      showStatus(
+        'scanStatus',
+        `✅ Scan completed. <a href="${result.reportUrl}" target="_blank">View Report</a>`,
+        'success'
+      );
+      showStep(3);
+    } else {
+      showStatus('scanStatus', result.message || 'Scan failed', 'error');
     }
+  } catch (error) {
+    showStatus('scanStatus', `❌ Error: ${error.message}`, 'error');
+  }
+}
 
-    res.sendFile(reportPath);
-});
-
-// Default Port
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`🚀 Server started at http://localhost:${PORT}`);
-});
+function viewReport() {
+  const reportContainer = document.getElementById('reportContainer');
+  reportContainer.innerHTML = `
+    <p>Loading report...</p>
+    <iframe src="/api/report/${currentSessionId}" class="report-frame" onload="this.previousElementSibling.style.display='none'"></iframe>
+  `;
+}
