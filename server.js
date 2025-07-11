@@ -5,8 +5,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const fetch = require('node-fetch');
-app.use(bodyParser.json());
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args)); // dynamic import for node-fetch
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -38,7 +37,55 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Step 1: Start Salesforce login (returns auth URL)
+// Salesforce login via CLI
+app.post('/api/login', async (req, res) => {
+  const { env } = req.body;
+  const alias = env === 'prod' ? 'prod-org' : 'sandbox-org';
+
+  exec(`sf org login web --alias ${alias}`, (err, stdout, stderr) => {
+    if (err) {
+      return res.status(500).json({ success: false, message: stderr });
+    }
+    res.json({ success: true, message: stdout });
+  });
+});
+
+// OAuth hardcoded login (manual testing only)
+app.post('/api/manual-login', async (req, res) => {
+  const tokenUrl = 'https://page-app-9104--qa.sandbox.my.salesforce.com/services/oauth2/token';
+
+  const params = new URLSearchParams();
+  params.append('grant_type', 'password');
+  params.append('client_id', '3MVG9b2K_4WHv18.bcIg.m3w_KNnwN4LXE0q4YvwTCG.hgPJ8rtcSWeLi33Dl6ZTf9cYNSGH2RpL8fx5BPMgq');
+  params.append('client_secret', 'A39089634EAFB4DBD0787F1421D9424F27F27C0259165D51E4DAEBD9AC404D7C');
+  params.append('username', 'test.integration.user.qa@saasworx.ai');
+  params.append('password', 'May@2025');
+
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+    const data = await response.json();
+
+    if (data.access_token) {
+      res.json({
+        success: true,
+        accessToken: data.access_token,
+        instanceUrl: data.instance_url,
+        userId: data.id,
+        orgId: data.id?.split('/')[4]
+      });
+    } else {
+      res.status(401).json({ success: false, message: data.error_description || 'Token fetch failed' });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// Step 1: Auth URL generation (not required when using manual login)
 app.post('/api/auth', async (req, res) => {
   const { loginUrl } = req.body;
   const sessionId = uuidv4();
@@ -79,11 +126,10 @@ app.post('/api/auth', async (req, res) => {
   }
 });
 
-// Step 1b: Check Auth Status
+// Check CLI auth status
 app.get('/api/check-auth/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   const session = activeSessions.get(sessionId);
-
   if (!session) return res.status(404).json({ success: false, message: 'Invalid session' });
 
   try {
@@ -104,7 +150,7 @@ app.get('/api/check-auth/:sessionId', async (req, res) => {
   }
 });
 
-// Step 2: Retrieve Metadata
+// Retrieve metadata using package.xml
 app.post('/api/retrieve', async (req, res) => {
   const { sessionId, packageXml } = req.body;
 
@@ -123,7 +169,6 @@ app.post('/api/retrieve', async (req, res) => {
     await executeCommand(initCmd, { cwd: projectPath });
 
     const sfProjectPath = path.join(projectPath, 'salesforce-project');
-
     const retrieveCmd = `sf project retrieve start --manifest ../package.xml --target-org ${session.alias}`;
     const result = await executeCommand(retrieveCmd, { cwd: sfProjectPath });
 
@@ -142,43 +187,7 @@ app.post('/api/retrieve', async (req, res) => {
   }
 });
 
-app.post('/api/manual-login', async (req, res) => {
-  const tokenUrl = 'https://page-app-9104--qa.sandbox.my.salesforce.com/services/oauth2/token';
-
-  const params = new URLSearchParams();
-  params.append('grant_type', 'password');
-  params.append('client_id', '3MVG9b2K_4WHv18.bcIg.m3w_KNnwN4LXE0q4YvwTCG.hgPJ8rtcSWeLi33Dl6ZTf9cYNSGH2RpL8fx5BPMgq');
-  params.append('client_secret', 'A39089634EAFB4DBD0787F1421D9424F27F27C0259165D51E4DAEBD9AC404D7C');
-  params.append('username', 'test.integration.user.qa@saasworx.ai');
-  params.append('password', 'May@2025'); // Consider appending security token if needed
-
-  try {
-    const response = await fetch(tokenUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params
-    });
-
-    const data = await response.json();
-
-    if (data.access_token) {
-      res.json({
-        success: true,
-        accessToken: data.access_token,
-        instanceUrl: data.instance_url,
-        userId: data.id,
-        orgId: data.id?.split('/')[4]
-      });
-    } else {
-      res.status(401).json({ success: false, message: data.error_description || 'Token fetch failed' });
-    }
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-
-// Step 3: Analyze Code
+// Analyze code via Salesforce Scanner
 app.post('/api/analyze', async (req, res) => {
   const { sessionId } = req.body;
 
@@ -223,7 +232,7 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// Step 4: Serve Report
+// Serve HTML report
 app.get('/api/report/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   const session = activeSessions.get(sessionId);
@@ -238,7 +247,7 @@ app.get('/api/report/:sessionId', async (req, res) => {
   res.sendFile(session.reportPath);
 });
 
-// Session Status
+// Session status endpoint
 app.get('/api/status/:sessionId', (req, res) => {
   const session = activeSessions.get(req.params.sessionId);
   if (!session) {
@@ -259,23 +268,7 @@ app.get('/api/status/:sessionId', (req, res) => {
   });
 });
 
-app.post('/api/login', async (req, res) => {
-  const { env } = req.body;
-  const alias = env === 'prod' ? 'prod-org' : 'sandbox-org';
-
-  // Trigger Salesforce CLI login command
-  exec(`sf org login web --alias ${alias}`, (err, stdout, stderr) => {
-    if (err) {
-      console.error(`Login error: ${stderr}`);
-      return res.status(500).json({ success: false, message: stderr });
-    }
-
-    console.log(`Login output: ${stdout}`);
-    res.json({ success: true, message: stdout });
-  });
-});
-
-// Auto-clean old sessions every hour
+// Cleanup old sessions hourly
 setInterval(() => {
   const now = new Date();
   for (const [sessionId, session] of activeSessions.entries()) {
@@ -288,6 +281,7 @@ setInterval(() => {
   }
 }, 60 * 60 * 1000);
 
+// Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
