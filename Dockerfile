@@ -1,15 +1,15 @@
-# Use Node.js base image
-FROM node:18-slim
+# Use more robust base image
+FROM node:18-bullseye
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     git \
     unzip \
-    openjdk-11-jdk \
+    openjdk-11-jre-headless \
     && rm -rf /var/lib/apt/lists/*
 
-# Set JAVA_HOME
+# Set JAVA_HOME (adjusted for JRE path)
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
 # Install Salesforce CLI
@@ -18,7 +18,7 @@ RUN npm install -g @salesforce/cli
 # Install Salesforce Code Analyzer
 RUN sf plugins install @salesforce/sfdx-scanner
 
-# Create app directory
+# Set working directory
 WORKDIR /usr/src/app
 
 # Copy package files
@@ -27,16 +27,14 @@ COPY package*.json ./
 # Install app dependencies
 RUN npm install
 
-# Copy app source
+# Copy rest of app
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p /usr/src/app/projects
-RUN mkdir -p /usr/src/app/temp
-RUN mkdir -p /usr/src/app/reports
+# Create directories
+RUN mkdir -p /usr/src/app/projects /usr/src/app/temp /usr/src/app/reports
 
-# Expose port
+# Expose application port
 EXPOSE 3000
 
-# Start the application
+# Start the app
 CMD ["npm", "start"]
