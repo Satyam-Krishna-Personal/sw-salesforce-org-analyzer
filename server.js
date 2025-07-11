@@ -93,7 +93,7 @@ app.post('/api/analyze', async (req, res) => {
 
         // Step 2: Authenticate using SF_ACCESS_TOKEN
         const loginCommand = `sf org login access-token --instance-url ${instanceUrl} --no-prompt --alias ${sessionId}`;
-        await executeCommand(l8oginCommand, {
+        await executeCommand(loginCommand, {
             cwd: projectPath,
             env: {
                 ...process.env,
