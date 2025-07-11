@@ -16,7 +16,7 @@ ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 RUN npm install @salesforce/cli --global
 
 # Install Salesforce Code Analyzer
-RUN sf plugins install code-analyzer
+RUN sf plugins install code-analyzer@latest
 
 # Set working directory
 WORKDIR /usr/src/app
