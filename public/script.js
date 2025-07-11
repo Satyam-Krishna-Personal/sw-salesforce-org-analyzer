@@ -1,165 +1,96 @@
-let currentSessionId = null;
-let currentStep = 1;
+const express = require('express');
+const cors = require('cors');
+const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-// Package.xml templates
-const packageTemplates = {
-    all: `<?xml version="1.0" encoding="UTF-8"?>
-<Package xmlns="http://soap.sforce.com/2006/04/metadata">
-    <types><members>*</members><name>ApexClass</name></types>
-    <types><members>*</members><name>ApexTrigger</name></types>
-    <types><members>*</members><name>CustomObject</name></types>
-    <types><members>*</members><name>Flow</name></types>
-    <types><members>*</members><name>ValidationRule</name></types>
-    <version>58.0</version>
-</Package>`,
-    apex: `<?xml version="1.0" encoding="UTF-8"?>
-<Package xmlns="http://soap.sforce.com/2006/04/metadata">
-    <types><members>*</members><name>ApexClass</name></types>
-    <types><members>*</members><name>ApexTrigger</name></types>
-    <version>58.0</version>
-</Package>`,
-    flows: `<?xml version="1.0" encoding="UTF-8"?>
-<Package xmlns="http://soap.sforce.com/2006/04/metadata">
-    <types><members>*</members><name>Flow</name></types>
-    <types><members>*</members><name>Workflow</name></types>
-    <version>58.0</version>
-</Package>`,
-    custom: `<?xml version="1.0" encoding="UTF-8"?>
-<Package xmlns="http://soap.sforce.com/2006/04/metadata">
-    <types><members>*</members><name>CustomObject</name></types>
-    <types><members>*</members><name>CustomField</name></types>
-    <types><members>*</members><name>ValidationRule</name></types>
-    <version>58.0</version>
-</Package>`
-};
+const app = express();
+app.use(cors());
+app.use(express.json());
+app.use(express.static('public')); // Serve index.html and related files from /public
 
-// Select template for package.xml
-function selectTemplate(templateType) {
-    document.getElementById('packageXml').value = packageTemplates[templateType];
-}
+// Login with Salesforce CLI (web)
+app.post('/api/login', (req, res) => {
+    const { env } = req.body; // 'prod' or 'sandbox'
+    const alias = env === 'prod' ? 'prod-org' : 'sandbox-org';
 
-// Update the top step progress indicator
-function updateStepIndicator(step) {
-    for (let i = 1; i <= 4; i++) {
-        const indicator = document.getElementById(`step${i}-indicator`);
-        indicator.classList.remove('active', 'completed');
-        if (i < step) {
-            indicator.classList.add('completed');
-        } else if (i === step) {
-            indicator.classList.add('active');
+    const command = env === 'prod'
+        ? `sf org login web --alias ${alias}`
+        : `sf org login web --alias ${alias} --instance-url https://test.salesforce.com`;
+
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            return res.status(500).json({ success: false, message: stderr });
         }
-    }
-}
+        return res.json({ success: true, message: stdout });
+    });
+});
 
-// Show one step section at a time
-function showStep(step) {
-    for (let i = 1; i <= 4; i++) {
-        document.getElementById(`step${i}`).classList.add('hidden');
-    }
-    document.getElementById(`step${step}`).classList.remove('hidden');
-    currentStep = step;
-    updateStepIndicator(step);
-}
+// Get Access Token and Org Info
+app.post('/api/token', (req, res) => {
+    const { alias } = req.body;
 
-// Show status with styles
-function showStatus(elementId, message, type = 'loading') {
-    const statusElement = document.getElementById(elementId);
-    statusElement.innerHTML = `<div class="status ${type}">${message}</div>`;
-}
-
-// Salesforce authentication using sf CLI - web-based flow
-async function authenticate() {
-    const username = document.getElementById('username').value;
-    const loginUrl = document.getElementById('loginUrl').value;
-
-    if (!username || !loginUrl) {
-        showStatus('authStatus', 'Please fill in all fields', 'error');
-        return;
-    }
-
-    showStatus('authStatus', 'Opening Salesforce login page. Please complete login...', 'loading');
-
-    try {
-        const response = await fetch(`/api/auth-url?loginUrl=${encodeURIComponent(loginUrl)}&username=${encodeURIComponent(username)}`);
-        const result = await response.json();
-
-        if (result.success && result.sessionId) {
-            currentSessionId = result.sessionId;
-
-            const authWindow = window.open(result.browserUrl, '_blank');
-            showStatus('authStatus', 'Login window opened. Please complete the login there and return here.', 'success');
-
-            // Optionally check login status after a delay (or via a "Continue" button)
-        } else {
-            showStatus('authStatus', `Authentication failed: ${result.message}`, 'error');
+    exec(`sf org display --target-org ${alias} --verbose`, (err, stdout, stderr) => {
+        if (err) {
+            return res.status(500).json({ success: false, message: stderr });
         }
-    } catch (err) {
-        showStatus('authStatus', `Error: ${err.message}`, 'error');
+
+        // Optionally parse token details
+        return res.json({ success: true, output: stdout });
+    });
+});
+
+// Retrieve Metadata API
+app.post('/api/retrieve', (req, res) => {
+    const { alias, packageXml } = req.body;
+    const tempDir = path.join(__dirname, 'tmp', alias);
+
+    if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
     }
-}
 
-// Retrieve metadata
-async function retrieveMetadata() {
-    const packageXml = document.getElementById('packageXml').value;
+    // Save package.xml
+    fs.writeFileSync(path.join(tempDir, 'package.xml'), packageXml);
 
-    if (!packageXml) {
-        showStatus('retrieveStatus', 'Please provide package.xml content', 'error');
-        return;
-    }
+    const command = `sf project retrieve start --manifest ${path.join(tempDir, 'package.xml')} --target-org ${alias} --output-dir ${tempDir}/retrieved`;
 
-    showStatus('retrieveStatus', 'Retrieving metadata from Salesforce... This may take a few minutes.', 'loading');
-
-    try {
-        const response = await fetch('/api/retrieve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: currentSessionId, packageXml })
-        });
-
-        const result = await response.json();
-
-        if (result.success) {
-            showStatus('retrieveStatus', 'Metadata retrieved successfully!', 'success');
-            setTimeout(() => showStep(3), 1500);
-        } else {
-            showStatus('retrieveStatus', `Metadata retrieval failed: ${result.message}`, 'error');
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            return res.status(500).json({ success: false, message: stderr });
         }
-    } catch (error) {
-        showStatus('retrieveStatus', `Error: ${error.message}`, 'error');
-    }
-}
+        return res.json({ success: true, message: stdout });
+    });
+});
 
-// Analyze code using Salesforce Code Analyzer
-async function analyzeCode() {
-    showStatus('analyzeStatus', 'Running code analysis... Please wait.', 'loading');
+// Run Code Analyzer
+app.post('/api/analyze', (req, res) => {
+    const { alias } = req.body;
+    const scanPath = path.join(__dirname, 'tmp', alias, 'retrieved');
 
-    try {
-        const response = await fetch('/api/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: currentSessionId })
-        });
+    const command = `sf scanner run --target ${scanPath} --format html --outfile ${scanPath}/report.html`;
 
-        const result = await response.json();
-
-        if (result.success) {
-            showStatus('analyzeStatus', 'Code analysis completed successfully!', 'success');
-            setTimeout(() => showStep(4), 1500);
-        } else {
-            showStatus('analyzeStatus', `Code analysis failed: ${result.message}`, 'error');
+    exec(command, (error, stdout, stderr) => {
+        if (error) {
+            return res.status(500).json({ success: false, message: stderr });
         }
-    } catch (error) {
-        showStatus('analyzeStatus', `Error: ${error.message}`, 'error');
+        return res.json({ success: true, message: stdout });
+    });
+});
+
+// Serve Analysis Report
+app.get('/api/report/:alias', (req, res) => {
+    const { alias } = req.params;
+    const reportPath = path.join(__dirname, 'tmp', alias, 'retrieved', 'report.html');
+
+    if (!fs.existsSync(reportPath)) {
+        return res.status(404).send('Report not found');
     }
-}
 
-// Load and show report
-function viewReport() {
-    const reportContainer = document.getElementById('reportContainer');
-    const reportUrl = `/api/report/${currentSessionId}`;
+    res.sendFile(reportPath);
+});
 
-    reportContainer.innerHTML = `
-        <p>Loading report...</p>
-        <iframe src="${reportUrl}" class="report-frame" onload="this.previousElementSibling.style.display='none'"></iframe>
-    `;
-}
+// Default Port
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`🚀 Server started at http://localhost:${PORT}`);
+});
