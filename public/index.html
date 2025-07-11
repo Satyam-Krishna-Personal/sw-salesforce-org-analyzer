@@ -1,219 +1,145 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Salesforce Org Analyzer</title>
-    <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Salesforce Org Analyzer</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
-
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🧠 Salesforce Org Analyzer</h1>
-            <p>Run CLI-based Metadata & Code Analysis on your Org</p>
-        </div>
-
-        <div class="content">
-            <!-- Step 1: Login -->
-            <div class="step" id="step1">
-                <h2>Step 1: Login to Salesforce Org</h2>
-                <p>Select Environment:</p>
-                <div class="env-buttons">
-                    <button class="btn" onclick="loginOrg('prod')">Login to Production</button>
-                    <button class="btn" onclick="loginOrg('sandbox')">Login to Sandbox</button>
-                    <button class="btn" onclick="loginHardcoded()">Test Login (Hardcoded)</button>
-                </div>
-                <div id="loginStatus"></div>
-            </div>
-
-            <!-- Step 2: Get Token -->
-            <div class="step hidden" id="step2">
-                <h2>Step 2: Fetch Org Access Token</h2>
-                <div class="form-group">
-                    <label for="alias">Org Alias (same used in login):</label>
-                    <input type="text" id="alias" placeholder="e.g. prod-org or sandbox-org" />
-                </div>
-                <button class="btn" onclick="fetchToken()">Get Access Token</button>
-                <div id="tokenStatus"></div>
-            </div>
-
-            <!-- Step 3: Retrieve Metadata -->
-            <div class="step hidden" id="step3">
-                <h2>Step 3: Retrieve Metadata</h2>
-                <div class="form-group">
-                    <label for="packageXml">Paste your package.xml:</label>
-                    <textarea id="packageXml" placeholder="Insert package.xml here..."></textarea>
-                </div>
-                <button class="btn" onclick="retrieveMetadata()">Retrieve</button>
-                <div id="retrieveStatus"></div>
-            </div>
-
-            <!-- Step 4: Run Analysis -->
-            <div class="step hidden" id="step4">
-                <h2>Step 4: Run Code Analyzer</h2>
-                <button class="btn" onclick="analyzeCode()">Run Analyzer</button>
-                <div id="analyzeStatus"></div>
-            </div>
-
-            <!-- Step 5: View Report -->
-            <div class="step hidden" id="step5">
-                <h2>Step 5: View Analysis Report</h2>
-                <button class="btn" onclick="viewReport()">View Report</button>
-                <div id="reportContainer"></div>
-            </div>
-        </div>
+  <div class="container">
+    <div class="header">
+      <h1>🧠 Salesforce Org Analyzer</h1>
+      <p>Run CLI-based Metadata & Code Analysis on your Org</p>
     </div>
 
-    <script>
-        let currentAlias = '';
+    <div class="content">
+      <!-- Step 1: Login -->
+      <div class="step" id="step1">
+        <h2>Step 1: Login to Salesforce Org</h2>
+        <div class="env-buttons">
+          <button class="btn" onclick="loginHardcoded()">Test Login (Hardcoded)</button>
+        </div>
+        <div id="loginStatus"></div>
+      </div>
 
-        function showStatus(id, message, type = 'info') {
-            document.getElementById(id).innerHTML = `<div class="status ${type}">${message}</div>`;
+      <!-- Step 2: Retrieve Metadata -->
+      <div class="step hidden" id="step2">
+        <h2>Step 2: Retrieve Metadata</h2>
+        <div class="form-group">
+          <label for="packageXml">Paste your package.xml:</label>
+          <textarea id="packageXml" placeholder="Insert package.xml here..."></textarea>
+        </div>
+        <button class="btn" onclick="retrieveMetadata()">Retrieve</button>
+        <div id="retrieveStatus"></div>
+      </div>
+
+      <!-- Step 3: Run Analysis -->
+      <div class="step hidden" id="step3">
+        <h2>Step 3: Run Code Analyzer</h2>
+        <button class="btn" onclick="analyzeCode()">Run Analyzer</button>
+        <div id="analyzeStatus"></div>
+      </div>
+
+      <!-- Step 4: View Report -->
+      <div class="step hidden" id="step4">
+        <h2>Step 4: View Analysis Report</h2>
+        <button class="btn" onclick="viewReport()">View Report</button>
+        <div id="reportContainer"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentSessionId = '';
+
+    function showStatus(id, message, type = 'info') {
+      document.getElementById(id).innerHTML = `<div class="status ${type}">${message}</div>`;
+    }
+
+    function showStep(stepNum) {
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById(`step${i}`).classList.add('hidden');
+      }
+      document.getElementById(`step${stepNum}`).classList.remove('hidden');
+    }
+
+    async function loginHardcoded() {
+      showStatus('loginStatus', 'Authenticating...', 'loading');
+
+      try {
+        const response = await fetch('/api/manual-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          showStatus('loginStatus', `✅ Authenticated! Org ID: ${result.orgId}`, 'success');
+          currentSessionId = result.accessToken;
+          showStep(2);
+        } else {
+          showStatus('loginStatus', `❌ Login failed: ${result.message}`, 'error');
         }
+      } catch (error) {
+        showStatus('loginStatus', `❌ Error: ${error.message}`, 'error');
+      }
+    }
 
-        function showStep(stepNum) {
-            for (let i = 1; i <= 5; i++) {
-                document.getElementById(`step${i}`).classList.add('hidden');
-            }
-            document.getElementById(`step${stepNum}`).classList.remove('hidden');
+    async function retrieveMetadata() {
+      const pkg = document.getElementById('packageXml').value.trim();
+      if (!pkg) {
+        showStatus('retrieveStatus', 'Provide package.xml content', 'error');
+        return;
+      }
+
+      showStatus('retrieveStatus', 'Retrieving metadata...', 'loading');
+      try {
+        const res = await fetch('/api/retrieve', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: currentSessionId, packageXml: pkg })
+        });
+        const result = await res.json();
+        if (result.success) {
+          showStatus('retrieveStatus', result.message, 'success');
+          showStep(3);
+        } else {
+          showStatus('retrieveStatus', result.message, 'error');
         }
+      } catch (e) {
+        showStatus('retrieveStatus', e.message, 'error');
+      }
+    }
 
-        async function loginOrg(env) {
-            showStatus('loginStatus', 'Opening browser for login...', 'loading');
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ env })
-                });
-
-                if (!res.ok) {
-                    const text = await res.text(); // get HTML response
-                    throw new Error(`Server error: ${res.status} ${text.slice(0, 100)}`);
-                }
-
-                const result = await res.json();
-
-                if (result.success) {
-                    showStatus('loginStatus', 'Login triggered successfully. Complete in browser then continue.', 'success');
-                    showStep(2);
-                } else {
-                    showStatus('loginStatus', result.message, 'error');
-                }
-            } catch (e) {
-                showStatus('loginStatus', 'Login failed: ' + e.message, 'error');
-            }
+    async function analyzeCode() {
+      showStatus('analyzeStatus', 'Running analyzer...', 'loading');
+      try {
+        const res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: currentSessionId })
+        });
+        const result = await res.json();
+        if (result.success) {
+          showStatus('analyzeStatus', result.message, 'success');
+          showStep(4);
+        } else {
+          showStatus('analyzeStatus', result.message, 'error');
         }
+      } catch (e) {
+        showStatus('analyzeStatus', e.message, 'error');
+      }
+    }
 
-
-        async function fetchToken() {
-            const alias = document.getElementById('alias').value.trim();
-            if (!alias) {
-                showStatus('tokenStatus', 'Alias is required', 'error');
-                return;
-            }
-
-            currentAlias = alias;
-            showStatus('tokenStatus', 'Fetching token info...', 'loading');
-
-            try {
-                const res = await fetch('/api/token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ alias })
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showStatus('tokenStatus', `<pre>${result.output}</pre>`, 'success');
-                    showStep(3);
-                } else {
-                    showStatus('tokenStatus', result.message, 'error');
-                }
-            } catch (e) {
-                showStatus('tokenStatus', e.message, 'error');
-            }
-        }
-
-        async function retrieveMetadata() {
-            const pkg = document.getElementById('packageXml').value.trim();
-            if (!pkg) {
-                showStatus('retrieveStatus', 'Provide package.xml content', 'error');
-                return;
-            }
-
-            showStatus('retrieveStatus', 'Retrieving metadata...', 'loading');
-            try {
-                const res = await fetch('/api/retrieve', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ alias: currentAlias, packageXml: pkg })
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showStatus('retrieveStatus', result.message, 'success');
-                    showStep(4);
-                } else {
-                    showStatus('retrieveStatus', result.message, 'error');
-                }
-            } catch (e) {
-                showStatus('retrieveStatus', e.message, 'error');
-            }
-        }
-
-        async function analyzeCode() {
-            showStatus('analyzeStatus', 'Running analyzer...', 'loading');
-            try {
-                const res = await fetch('/api/analyze', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ alias: currentAlias })
-                });
-                const result = await res.json();
-                if (result.success) {
-                    showStatus('analyzeStatus', result.message, 'success');
-                    showStep(5);
-                } else {
-                    showStatus('analyzeStatus', result.message, 'error');
-                }
-            } catch (e) {
-                showStatus('analyzeStatus', e.message, 'error');
-            }
-        }
-
-        async function loginHardcoded() {
-            showStatus('loginStatus', 'Authenticating...', 'loading');
-
-            try {
-                const response = await fetch('/api/manual-login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    showStatus('loginStatus', `Authenticated! Org ID: ${result.orgId}`, 'success');
-                    currentSessionId = result.accessToken;
-                    // Proceed to Step 2 (metadata retrieval)
-                    showStep(2);
-                } else {
-                    showStatus('loginStatus', `Login failed: ${result.message}`, 'error');
-                }
-            } catch (error) {
-                showStatus('loginStatus', `Error: ${error.message}`, 'error');
-            }
-        }
-
-        function viewReport() {
-            const reportContainer = document.getElementById('reportContainer');
-            reportContainer.innerHTML = `
-                <p>Loading report...</p>
-                <iframe src="/api/report/${currentAlias}" class="report-frame" onload="this.previousElementSibling.style.display='none'"></iframe>
-            `;
-        }
-    </script>
+    function viewReport() {
+      const reportContainer = document.getElementById('reportContainer');
+      reportContainer.innerHTML = `
+        <p>Loading report...</p>
+        <iframe src="/api/report/${currentSessionId}" class="report-frame" onload="this.previousElementSibling.style.display='none'"></iframe>
+      `;
+    }
+  </script>
 </body>
-
 </html>
