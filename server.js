@@ -102,19 +102,19 @@ app.post('/api/analyze', async (req, res) => {
         // Step 3: Try to generate manifest, if it fails, create a custom one
         const manifestDir = path.join(projectPath, 'manifest');
         await fs.ensureDir(manifestDir);
-        
+
         let manifestCreated = false;
-        
+
         try {
             const manifestCmd = `sf project generate manifest --from-org ${sessionId} --metadata ApexClass,ApexTrigger,LightningComponentBundle,AuraDefinitionBundle`;
             await executeCommand(manifestCmd, { cwd: projectPath });
-            
+
             const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
             manifestCreated = await fs.pathExists(manifestPath);
         } catch (manifestError) {
             console.log('Manifest generation failed, will create custom manifest:', manifestError.message);
         }
-        
+
         // Step 4: If manifest wasn't created, create a custom one
         if (!manifestCreated) {
             const customManifest = `<?xml version="1.0" encoding="UTF-8"?>
@@ -137,7 +137,7 @@ app.post('/api/analyze', async (req, res) => {
     </types>
     <version>62.0</version>
 </Package>`;
-            
+
             const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
             await fs.writeFile(manifestPath, customManifest);
             console.log('Created custom manifest file');
@@ -150,7 +150,7 @@ app.post('/api/analyze', async (req, res) => {
         // Step 6: Verify force-app directory exists before scanning
         const forceAppPath = path.join(projectPath, 'force-app');
         const forceAppExists = await fs.pathExists(forceAppPath);
-        
+
         if (!forceAppExists) {
             // Try alternative retrieve approach
             console.log('No force-app directory found, trying alternative retrieve...');
