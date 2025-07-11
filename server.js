@@ -101,18 +101,19 @@ app.post('/api/analyze', async (req, res) => {
             }
         });
 
-        // ✅ Step 3: Generate manifest from org metadata
-        const manifestCmd = `sf project generate manifest --from-org ${sessionId}`;
+        // ✅ Step 3: Generate manifest from org metadata (only required types)
+        const manifestCmd = `sf project generate manifest --from-org ${sessionId} --metadata ApexClass,ApexTrigger,LightningComponentBundle,AuraDefinitionBundle`;
         await executeCommand(manifestCmd, { cwd: projectPath });
 
-        // ✅ Step 4: Retrieve all metadata using generated manifest
+        // ✅ Step 4: Retrieve metadata using generated manifest
         const retrieveCmd = `sf project retrieve start --manifest manifest/package.xml --target-org ${sessionId}`;
         await executeCommand(retrieveCmd, { cwd: projectPath });
 
-        // Step 5: Run scanner
+        // ✅ Step 5: Run scanner
         const reportPath = path.join(__dirname, 'reports', `CodeAnalyzerResults_${sessionId}.html`);
-        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app/main/default --projectdir force-app/main/default`;
+        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app --projectdir force-app`;
         await executeCommand(scanCmd, { cwd: projectPath });
+
         // Save session info
         activeSessions.set(sessionId, {
             accessToken,
