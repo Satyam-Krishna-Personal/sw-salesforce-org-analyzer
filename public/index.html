@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salesforce Org Analyzer POC</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .step {
+            margin-bottom: 30px;
+            padding: 25px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            border-left: 5px solid #4CAF50;
+            transition: all 0.3s ease;
+        }
+
+        .step:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .step h3 {
+            color: #2E7D32;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        input[type="text"], input[type="url"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus, input[type="url"]:focus, textarea:focus {
+            border-color: #4CAF50;
+            outline: none;
+        }
+
+        textarea {
+            min-height: 200px;
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #2E7D32);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .report-frame {
+            width: 100%;
+            height: 800px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .step-item {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            background: #e9ecef;
+            margin: 0 5px;
+            transition: all 0.3s ease;
+        }
+
+        .step-item.active {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .step-item.completed {
+            background: #28a745;
+            color: white;
+        }
+
+        .package-templates {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .template-card {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .template-card:hover {
+            border-color: #4CAF50;
+            transform: translateY(-2px);
+        }
+
+        .template-card h4 {
+            color: #2E7D32;
+            margin-bottom: 10px;
+        }
+
+        .template-card p {
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Salesforce Org Analyzer</h1>
+            <p>Analyze your Salesforce org with automated code scanning</p>
+        </div>
+
+        <div class="content">
+            <div class="step-indicator">
+                <div class="step-item active" id="step1-indicator">1. Authenticate</div>
+                <div class="step-item" id="step2-indicator">2. Retrieve Metadata</div>
+                <div class="step-item" id="step3-indicator">3. Analyze Code</div>
+                <div class="step-item" id="step4-indicator">4. View Report</div>
+            </div>
+
+            <!-- Step 1: Authentication -->
+            <div class="step" id="step1">
+                <h3>Step 1: Authenticate with Salesforce</h3>
+                <div class="form-group">
+                    <label for="username">Username/Email:</label>
+                    <input type="text" id="username" placeholder="Enter your Salesforce username">
+                </div>
+                <div class="form-group">
+                    <label for="loginUrl">Login URL:</label>
+                    <input type="url" id="loginUrl" value="https://login.salesforce.com" placeholder="https://login.salesforce.com">
+                </div>
+                <button class="btn" onclick="authenticate()">Authenticate</button>
+                <div id="authStatus"></div>
+            </div>
+
+            <!-- Step 2: Metadata Retrieval -->
+            <div class="step hidden" id="step2">
+                <h3>Step 2: Retrieve Metadata</h3>
+                <p>Select a package template or create your own package.xml:</p>
+                
+                <div class="package-templates">
+                    <div class="template-card" onclick="selectTemplate('all')">
+                        <h4>All Components</h4>
+                        <p>Retrieves all metadata types (may take longer)</p>
+                    </div>
+                    <div class="template-card" onclick="selectTemplate('apex')">
+                        <h4>Apex Only</h4>
+                        <p>Classes, triggers, and test classes</p>
+                    </div>
+                    <div class="template-card" onclick="selectTemplate('flows')">
+                        <h4>Flows & Processes</h4>
+                        <p>Flows, process builder, and workflows</p>
+                    </div>
+                    <div class="template-card" onclick="selectTemplate('custom')">
+                        <h4>Custom Objects</h4>
+                        <p>Custom objects, fields, and validation rules</p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="packageXml">Package.xml Content:</label>
+                    <textarea id="packageXml" placeholder="Paste your package.xml content here..."></textarea>
+                </div>
+                <button class="btn" onclick="retrieveMetadata()">Retrieve Metadata</button>
+                <div id="retrieveStatus"></div>
+            </div>
+
+            <!-- Step 3: Code Analysis -->
+            <div class="step hidden" id="step3">
+                <h3>Step 3: Run Code Analysis</h3>
+                <p>This will analyze your retrieved metadata using Salesforce Code Analyzer.</p>
+                <button class="btn" onclick="analyzeCode()">Run Analysis</button>
+                <div id="analyzeStatus"></div>
+            </div>
+
+            <!-- Step 4: View Report -->
+            <div class="step hidden" id="step4">
+                <h3>Step 4: View Analysis Report</h3>
+                <p>Your code analysis report is ready!</p>
+                <button class="btn" onclick="viewReport()">View Report</button>
+                <div id="reportContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSessionId = null;
+        let currentStep = 1;
+
+        // Package.xml templates
+        const packageTemplates = {
+            all: `<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>*</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>ApexTrigger</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>Flow</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>ValidationRule</name>
+    </types>
+    <version>58.0</version>
+</Package>`,
+            apex: `<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>*</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>ApexTrigger</name>
+    </types>
+    <version>58.0</version>
+</Package>`,
+            flows: `<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>*</members>
+        <name>Flow</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>Workflow</name>
+    </types>
+    <version>58.0</version>
+</Package>`,
+            custom: `<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>*</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>ValidationRule</name>
+    </types>
+    <version>58.0</version>
+</Package>`
+        };
+
+        function selectTemplate(templateType) {
+            document.getElementById('packageXml').value = packageTemplates[templateType];
+        }
+
+        function updateStepIndicator(step) {
+            for (let i = 1; i <= 4; i++) {
+                const indicator = document.getElementById(`step${i}-indicator`);
+                indicator.classList.remove('active', 'completed');
+                if (i < step) {
+                    indicator.classList.add('completed');
+                } else if (i === step) {
+                    indicator.classList.add('active');
+                }
+            }
+        }
+
+        function showStep(step) {
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById(`step${i}`).classList.add('hidden');
+            }
+            document.getElementById(`step${step}`).classList.remove('hidden');
+            currentStep = step;
+            updateStepIndicator(step);
+        }
+
+        function showStatus(elementId, message, type = 'loading') {
+            const statusElement = document.getElementById(elementId);
+            statusElement.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+
+        async function authenticate() {
+            const username = document.getElementById('username').value;
+            const loginUrl = document.getElementById('loginUrl').value;
+
+            if (!username || !loginUrl) {
+                showStatus('authStatus', 'Please fill in all fields', 'error');
+                return;
+            }
+
+            showStatus('authStatus', 'Authenticating with Salesforce... Please complete the login process.', 'loading');
+
+            try {
+                const response = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, loginUrl })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentSessionId = result.sessionId;
+                    showStatus('authStatus', 'Authentication successful!', 'success');
+                    setTimeout(() => showStep(2), 1500);
+                } else {
+                    showStatus('authStatus', `Authentication failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('authStatus', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function retrieveMetadata() {
+            const packageXml = document.getElementById('packageXml').value;
+
+            if (!packageXml) {
+                showStatus('retrieveStatus', 'Please provide package.xml content', 'error');
+                return;
+            }
+
+            showStatus('retrieveStatus', 'Retrieving metadata from Salesforce... This may take a few minutes.', 'loading');
+
+            try {
+                const response = await fetch('/api/retrieve', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ sessionId: currentSessionId, packageXml })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('retrieveStatus', 'Metadata retrieved successfully!', 'success');
+                    setTimeout(() => showStep(3), 1500);
+                } else {
+                    showStatus('retrieveStatus', `Metadata retrieval failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('retrieveStatus', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function analyzeCode() {
+            showStatus('analyzeStatus', 'Running code analysis... This may take several minutes.', 'loading');
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ sessionId: currentSessionId })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('analyzeStatus', 'Code analysis completed successfully!', 'success');
+                    setTimeout(() => showStep(4), 1500);
+                } else {
+                    showStatus('analyzeStatus', `Code analysis failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('analyzeStatus', `Error: ${error.message}`, 'error');
+            }
+        }
+
+        function viewReport() {
+            const reportContainer = document.getElementById('reportContainer');
+            const reportUrl = `/api/report/${currentSessionId}`;
+            
+            reportContainer.innerHTML = `
+                <p>Loading report...</p>
+                <iframe src="${reportUrl}" class="report-frame" onload="this.previousElementSibling.style.display='none'"></iframe>
+            `;
+        }
+    </script>
+</body>
+</html>
