@@ -5,6 +5,8 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const fetch = require('node-fetch');
+app.use(bodyParser.json());
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -139,6 +141,42 @@ app.post('/api/retrieve', async (req, res) => {
     });
   }
 });
+
+app.post('/api/manual-login', async (req, res) => {
+  const tokenUrl = 'https://page-app-9104--qa.sandbox.my.salesforce.com/services/oauth2/token';
+
+  const params = new URLSearchParams();
+  params.append('grant_type', 'password');
+  params.append('client_id', '3MVG9b2K_4WHv18.bcIg.m3w_KNnwN4LXE0q4YvwTCG.hgPJ8rtcSWeLi33Dl6ZTf9cYNSGH2RpL8fx5BPMgq');
+  params.append('client_secret', 'A39089634EAFB4DBD0787F1421D9424F27F27C0259165D51E4DAEBD9AC404D7C');
+  params.append('username', 'test.integration.user.qa@saasworx.ai');
+  params.append('password', 'May@2025'); // Consider appending security token if needed
+
+  try {
+    const response = await fetch(tokenUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params
+    });
+
+    const data = await response.json();
+
+    if (data.access_token) {
+      res.json({
+        success: true,
+        accessToken: data.access_token,
+        instanceUrl: data.instance_url,
+        userId: data.id,
+        orgId: data.id?.split('/')[4]
+      });
+    } else {
+      res.status(401).json({ success: false, message: data.error_description || 'Token fetch failed' });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 
 // Step 3: Analyze Code
 app.post('/api/analyze', async (req, res) => {

@@ -23,6 +23,7 @@
                 <div class="env-buttons">
                     <button class="btn" onclick="loginOrg('prod')">Login to Production</button>
                     <button class="btn" onclick="loginOrg('sandbox')">Login to Sandbox</button>
+                    <button class="btn" onclick="loginHardcoded()">Test Login (Hardcoded)</button>
                 </div>
                 <div id="loginStatus"></div>
             </div>
@@ -181,6 +182,30 @@
             }
         }
 
+        async function loginHardcoded() {
+            showStatus('loginStatus', 'Authenticating...', 'loading');
+
+            try {
+                const response = await fetch('/api/manual-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showStatus('loginStatus', `Authenticated! Org ID: ${result.orgId}`, 'success');
+                    currentSessionId = result.accessToken;
+                    // Proceed to Step 2 (metadata retrieval)
+                    showStep(2);
+                } else {
+                    showStatus('loginStatus', `Login failed: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showStatus('loginStatus', `Error: ${error.message}`, 'error');
+            }
+        }
+
         function viewReport() {
             const reportContainer = document.getElementById('reportContainer');
             reportContainer.innerHTML = `
@@ -190,4 +215,5 @@
         }
     </script>
 </body>
+
 </html>
