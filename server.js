@@ -38,8 +38,8 @@ app.post('/api/manual-login', async (req, res) => {
     params.append('grant_type', 'password');
     params.append('client_id', '3MVG9b2K_4WHv18.bcIg.m3w_KNnwN4LXE0q4YvwTCG.hgPJ8rtcSWeLi33Dl6ZTf9cYNSGH2RpL8fx5BPMgq');
     params.append('client_secret', 'A39089634EAFB4DBD0787F1421D9424F27F27C0259165D51E4DAEBD9AC404D7C');
-    params.append('username', 'test.integration.user.qa@saasworx.ai');
-    params.append('password', 'May@2025');
+    params.append('username', 'satyam.tcc.qa@saasworx.ai');
+    params.append('password', 'July@2025');
 
     try {
         const response = await fetch(tokenUrl, {
@@ -203,7 +203,7 @@ app.post('/api/analyze', async (req, res) => {
 
         res.status(500).json({
             success: false,
-            message: 'Analyzer failed',
+            message: 'Analyzer failed' + (err.error || err.message),
             error: err.error || err.message,
             stderr: err.stderr
         });
