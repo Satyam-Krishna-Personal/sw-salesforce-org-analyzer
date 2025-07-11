@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
 # Install Salesforce CLI
-RUN npm install -g @salesforce/cli
+RUN npm install @salesforce/cli --global
 
 # Install Salesforce Code Analyzer
 RUN sf plugins install code-analyzer
