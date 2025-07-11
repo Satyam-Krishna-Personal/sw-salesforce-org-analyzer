@@ -5,7 +5,7 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args)); // dynamic import for node-fetch
+const fetch = require('node-fetch'); // node-fetch v2 for CommonJS
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,10 +16,10 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Session store
+// Session Store
 const activeSessions = new Map();
 
-// Utility: Run CLI commands
+// Utility to run CLI commands
 const executeCommand = (command, options = {}) => {
   return new Promise((resolve, reject) => {
     exec(command, options, (error, stdout, stderr) => {
@@ -32,25 +32,12 @@ const executeCommand = (command, options = {}) => {
   });
 };
 
-// Home route
+// Serve index.html
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Salesforce login via CLI
-app.post('/api/login', async (req, res) => {
-  const { env } = req.body;
-  const alias = env === 'prod' ? 'prod-org' : 'sandbox-org';
-
-  exec(`sf org login web --alias ${alias}`, (err, stdout, stderr) => {
-    if (err) {
-      return res.status(500).json({ success: false, message: stderr });
-    }
-    res.json({ success: true, message: stdout });
-  });
-});
-
-// OAuth hardcoded login (manual testing only)
+// ========== LOGIN WITH HARDCODED CREDENTIALS ==========
 app.post('/api/manual-login', async (req, res) => {
   const tokenUrl = 'https://page-app-9104--qa.sandbox.my.salesforce.com/services/oauth2/token';
 
@@ -67,6 +54,7 @@ app.post('/api/manual-login', async (req, res) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params
     });
+
     const data = await response.json();
 
     if (data.access_token) {
@@ -85,72 +73,23 @@ app.post('/api/manual-login', async (req, res) => {
   }
 });
 
-// Step 1: Auth URL generation (not required when using manual login)
-app.post('/api/auth', async (req, res) => {
-  const { loginUrl } = req.body;
-  const sessionId = uuidv4();
-  const projectPath = path.join(__dirname, 'projects', sessionId);
-  await fs.ensureDir(projectPath);
+// ========== SF LOGIN VIA BROWSER ==========
+app.post('/api/login', async (req, res) => {
+  const { env } = req.body;
+  const alias = env === 'prod' ? 'prod-org' : 'sandbox-org';
 
-  const alias = `org-${sessionId}`;
-  const authUrlCommand = `sf org login web --instance-url ${loginUrl} --alias ${alias} --no-prompt --json`;
-
-  try {
-    const result = await executeCommand(authUrlCommand, { cwd: projectPath });
-    const parsed = JSON.parse(result.stdout);
-
-    if (parsed.status === 0 && parsed.result && parsed.result.authorizationUrl) {
-      activeSessions.set(sessionId, {
-        loginUrl,
-        alias,
-        projectPath,
-        authenticated: false,
-        timestamp: new Date()
-      });
-
-      res.json({
-        success: true,
-        sessionId,
-        authUrl: parsed.result.authorizationUrl
-      });
-    } else {
-      throw new Error('Failed to generate authorization URL');
-    }
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: 'Authentication URL generation failed',
-      error: err.error || err.message,
-      stderr: err.stderr
-    });
-  }
-});
-
-// Check CLI auth status
-app.get('/api/check-auth/:sessionId', async (req, res) => {
-  const { sessionId } = req.params;
-  const session = activeSessions.get(sessionId);
-  if (!session) return res.status(404).json({ success: false, message: 'Invalid session' });
-
-  try {
-    const command = `sf org display --target-org ${session.alias} --json`;
-    const result = await executeCommand(command);
-    const parsed = JSON.parse(result.stdout);
-
-    if (parsed.status === 0 && parsed.result && parsed.result.username) {
-      session.authenticated = true;
-      session.username = parsed.result.username;
-      activeSessions.set(sessionId, session);
-      return res.json({ success: true, authenticated: true, username: session.username });
+  exec(`sf org login web --alias ${alias}`, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Login error: ${stderr}`);
+      return res.status(500).json({ success: false, message: stderr });
     }
 
-    return res.json({ success: false, authenticated: false });
-  } catch {
-    return res.json({ success: false, authenticated: false });
-  }
+    console.log(`Login output: ${stdout}`);
+    res.json({ success: true, message: stdout });
+  });
 });
 
-// Retrieve metadata using package.xml
+// ========== RETRIEVE METADATA ==========
 app.post('/api/retrieve', async (req, res) => {
   const { sessionId, packageXml } = req.body;
 
@@ -169,6 +108,7 @@ app.post('/api/retrieve', async (req, res) => {
     await executeCommand(initCmd, { cwd: projectPath });
 
     const sfProjectPath = path.join(projectPath, 'salesforce-project');
+
     const retrieveCmd = `sf project retrieve start --manifest ../package.xml --target-org ${session.alias}`;
     const result = await executeCommand(retrieveCmd, { cwd: sfProjectPath });
 
@@ -187,7 +127,7 @@ app.post('/api/retrieve', async (req, res) => {
   }
 });
 
-// Analyze code via Salesforce Scanner
+// ========== ANALYZE CODE ==========
 app.post('/api/analyze', async (req, res) => {
   const { sessionId } = req.body;
 
@@ -232,7 +172,7 @@ app.post('/api/analyze', async (req, res) => {
   }
 });
 
-// Serve HTML report
+// ========== REPORT ==========
 app.get('/api/report/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   const session = activeSessions.get(sessionId);
@@ -247,7 +187,7 @@ app.get('/api/report/:sessionId', async (req, res) => {
   res.sendFile(session.reportPath);
 });
 
-// Session status endpoint
+// ========== SESSION STATUS ==========
 app.get('/api/status/:sessionId', (req, res) => {
   const session = activeSessions.get(req.params.sessionId);
   if (!session) {
@@ -268,7 +208,7 @@ app.get('/api/status/:sessionId', (req, res) => {
   });
 });
 
-// Cleanup old sessions hourly
+// ========== CLEANUP OLD SESSIONS ==========
 setInterval(() => {
   const now = new Date();
   for (const [sessionId, session] of activeSessions.entries()) {
