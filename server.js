@@ -86,21 +86,28 @@ app.post('/api/analyze', async (req, res) => {
         await fs.ensureDir(sessionPath);
         await fs.ensureDir(path.join(__dirname, 'reports'));
 
-        // Create new SFDX project
+        // Step 1: Create new SFDX project
         await executeCommand(`sf project generate --name salesforce-project`, { cwd: sessionPath });
 
-        // Auth to org with token
-        const authCmd = `sf org login access-token --instance-url ${instanceUrl} --set-default --alias ${sessionId} --no-prompt --access-token ${accessToken}`;
-        await executeCommand(authCmd, { cwd: projectPath });
+        // Step 2: Authenticate using SF_ACCESS_TOKEN env variable
+        const loginCommand = `sf org login access-token --instance-url ${instanceUrl} --no-prompt --alias ${sessionId}`;
+        await executeCommand(loginCommand, {
+            cwd: projectPath,
+            env: {
+                ...process.env,
+                SF_ACCESS_TOKEN: accessToken
+            }
+        });
 
-        // Retrieve all metadata
-        const retrieveCmd = `sf project retrieve start --target-org ${sessionId}`;
-        await executeCommand(retrieveCmd, { cwd: projectPath });
+        // Step 3: Retrieve metadata from org
+        const retrieveCommand = `sf project retrieve start --target-org ${sessionId}`;
+        await executeCommand(retrieveCommand, { cwd: projectPath });
 
-        // Run Code Scanner
-        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app/main/default --projectdir force-app/main/default`;
-        await executeCommand(scanCmd, { cwd: projectPath });
+        // Step 4: Run code analyzer
+        const scanCommand = `sf scanner run --format html --outfile ${reportPath} --target force-app/main/default --projectdir force-app/main/default`;
+        await executeCommand(scanCommand, { cwd: projectPath });
 
+        // Save session info
         activeSessions.set(sessionId, {
             accessToken,
             instanceUrl,
@@ -112,6 +119,7 @@ app.post('/api/analyze', async (req, res) => {
             timestamp: new Date()
         });
 
+        // Response
         res.json({
             success: true,
             sessionId,
