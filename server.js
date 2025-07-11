@@ -15,10 +15,10 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Store active sessions
+// Session store
 const activeSessions = new Map();
 
-// Utility function to execute commands
+// Utility: Run CLI commands
 const executeCommand = (command, options = {}) => {
   return new Promise((resolve, reject) => {
     exec(command, options, (error, stdout, stderr) => {
@@ -31,211 +31,209 @@ const executeCommand = (command, options = {}) => {
   });
 };
 
-// Home page
+// Home route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Authenticate with Salesforce
+// Step 1: Start Salesforce login (returns auth URL)
 app.post('/api/auth', async (req, res) => {
-  const { username, loginUrl } = req.body;
+  const { loginUrl } = req.body;
   const sessionId = uuidv4();
   const projectPath = path.join(__dirname, 'projects', sessionId);
-  
+  await fs.ensureDir(projectPath);
+
+  const alias = `org-${sessionId}`;
+  const authUrlCommand = `sf org login web --instance-url ${loginUrl} --alias ${alias} --no-prompt --json`;
+
   try {
-    // Create project directory
-    await fs.ensureDir(projectPath);
-    
-    // Authenticate with Salesforce
-    const authCommand = `sf org login web --instance-url ${loginUrl} --alias ${sessionId}`;
-    const authResult = await executeCommand(authCommand, { cwd: projectPath });
-    
-    // Store session info
-    activeSessions.set(sessionId, {
-      username,
-      loginUrl,
-      projectPath,
-      authenticated: true,
-      timestamp: new Date()
-    });
-    
-    res.json({
-      success: true,
-      sessionId,
-      message: 'Successfully authenticated with Salesforce',
-      authOutput: authResult.stdout
-    });
-    
-  } catch (error) {
+    const result = await executeCommand(authUrlCommand, { cwd: projectPath });
+    const parsed = JSON.parse(result.stdout);
+
+    if (parsed.status === 0 && parsed.result && parsed.result.authorizationUrl) {
+      activeSessions.set(sessionId, {
+        loginUrl,
+        alias,
+        projectPath,
+        authenticated: false,
+        timestamp: new Date()
+      });
+
+      res.json({
+        success: true,
+        sessionId,
+        authUrl: parsed.result.authorizationUrl
+      });
+    } else {
+      throw new Error('Failed to generate authorization URL');
+    }
+  } catch (err) {
     res.status(500).json({
       success: false,
-      message: 'Authentication failed',
-      error: error.error || error.message,
-      stderr: error.stderr
+      message: 'Authentication URL generation failed',
+      error: err.error || err.message,
+      stderr: err.stderr
     });
   }
 });
 
-// Retrieve metadata using package.xml
+// Step 1b: Check Auth Status
+app.get('/api/check-auth/:sessionId', async (req, res) => {
+  const { sessionId } = req.params;
+  const session = activeSessions.get(sessionId);
+
+  if (!session) return res.status(404).json({ success: false, message: 'Invalid session' });
+
+  try {
+    const command = `sf org display --target-org ${session.alias} --json`;
+    const result = await executeCommand(command);
+    const parsed = JSON.parse(result.stdout);
+
+    if (parsed.status === 0 && parsed.result && parsed.result.username) {
+      session.authenticated = true;
+      session.username = parsed.result.username;
+      activeSessions.set(sessionId, session);
+      return res.json({ success: true, authenticated: true, username: session.username });
+    }
+
+    return res.json({ success: false, authenticated: false });
+  } catch {
+    return res.json({ success: false, authenticated: false });
+  }
+});
+
+// Step 2: Retrieve Metadata
 app.post('/api/retrieve', async (req, res) => {
   const { sessionId, packageXml } = req.body;
-  
+
   if (!activeSessions.has(sessionId)) {
     return res.status(400).json({ success: false, message: 'Invalid session' });
   }
-  
+
   const session = activeSessions.get(sessionId);
   const projectPath = session.projectPath;
-  
+
   try {
-    // Create package.xml file
     const packageXmlPath = path.join(projectPath, 'package.xml');
     await fs.writeFile(packageXmlPath, packageXml);
-    
-    // Create SFDX project
-    const projectInitCommand = `sf project generate --name salesforce-project`;
-    await executeCommand(projectInitCommand, { cwd: projectPath });
-    
+
+    const initCmd = `sf project generate --name salesforce-project`;
+    await executeCommand(initCmd, { cwd: projectPath });
+
     const sfProjectPath = path.join(projectPath, 'salesforce-project');
-    
-    // Retrieve metadata
-    const retrieveCommand = `sf project retrieve start --manifest ../package.xml --target-org ${sessionId}`;
-    const retrieveResult = await executeCommand(retrieveCommand, { cwd: sfProjectPath });
-    
-    // Update session
+
+    const retrieveCmd = `sf project retrieve start --manifest ../package.xml --target-org ${session.alias}`;
+    const result = await executeCommand(retrieveCmd, { cwd: sfProjectPath });
+
     session.retrieved = true;
     session.sfProjectPath = sfProjectPath;
     activeSessions.set(sessionId, session);
-    
-    res.json({
-      success: true,
-      message: 'Metadata retrieved successfully',
-      output: retrieveResult.stdout
-    });
-    
-  } catch (error) {
+
+    res.json({ success: true, message: 'Metadata retrieved', output: result.stdout });
+  } catch (err) {
     res.status(500).json({
       success: false,
       message: 'Metadata retrieval failed',
-      error: error.error || error.message,
-      stderr: error.stderr
+      error: err.error || err.message,
+      stderr: err.stderr
     });
   }
 });
 
-// Run Code Analyzer
+// Step 3: Analyze Code
 app.post('/api/analyze', async (req, res) => {
   const { sessionId } = req.body;
-  
+
   if (!activeSessions.has(sessionId)) {
     return res.status(400).json({ success: false, message: 'Invalid session' });
   }
-  
+
   const session = activeSessions.get(sessionId);
-  
   if (!session.retrieved) {
-    return res.status(400).json({ success: false, message: 'No metadata retrieved yet' });
+    return res.status(400).json({ success: false, message: 'Metadata not retrieved' });
   }
-  
+
   const sfProjectPath = session.sfProjectPath;
-  const reportsPath = path.join(__dirname, 'reports');
-  await fs.ensureDir(reportsPath);
-  
+  const reportsDir = path.join(__dirname, 'reports');
+  await fs.ensureDir(reportsDir);
+
   const reportFile = `CodeAnalyzerResults_${sessionId}.html`;
-  const reportPath = path.join(reportsPath, reportFile);
-  
+  const reportPath = path.join(reportsDir, reportFile);
+
   try {
-    // Run Salesforce Code Analyzer
-    const analyzeCommand = `sf scanner run --format html --outfile ${reportPath} --target force-app/main/default --projectdir force-app/main/default`;
-    const analyzeResult = await executeCommand(analyzeCommand, { cwd: sfProjectPath });
-    
-    // Update session
+    const analyzeCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app/main/default --projectdir force-app/main/default`;
+    const result = await executeCommand(analyzeCmd, { cwd: sfProjectPath });
+
     session.analyzed = true;
     session.reportPath = reportPath;
     session.reportFile = reportFile;
     activeSessions.set(sessionId, session);
-    
+
     res.json({
       success: true,
-      message: 'Code analysis completed successfully',
+      message: 'Analysis complete',
       reportUrl: `/api/report/${sessionId}`,
-      output: analyzeResult.stdout
+      output: result.stdout
     });
-    
-  } catch (error) {
+  } catch (err) {
     res.status(500).json({
       success: false,
       message: 'Code analysis failed',
-      error: error.error || error.message,
-      stderr: error.stderr
+      error: err.error || err.message,
+      stderr: err.stderr
     });
   }
 });
 
-// Serve analysis report
+// Step 4: Serve Report
 app.get('/api/report/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
-  
-  if (!activeSessions.has(sessionId)) {
-    return res.status(404).json({ success: false, message: 'Session not found' });
-  }
-  
   const session = activeSessions.get(sessionId);
-  
-  if (!session.analyzed || !session.reportPath) {
+
+  if (!session || !session.analyzed || !session.reportPath) {
     return res.status(404).json({ success: false, message: 'Report not available' });
   }
-  
-  try {
-    const reportExists = await fs.pathExists(session.reportPath);
-    if (!reportExists) {
-      return res.status(404).json({ success: false, message: 'Report file not found' });
-    }
-    
-    res.sendFile(session.reportPath);
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Error serving report', error: error.message });
-  }
+
+  const exists = await fs.pathExists(session.reportPath);
+  if (!exists) return res.status(404).json({ success: false, message: 'Report file not found' });
+
+  res.sendFile(session.reportPath);
 });
 
-// Get session status
+// Session Status
 app.get('/api/status/:sessionId', (req, res) => {
-  const { sessionId } = req.params;
-  
-  if (!activeSessions.has(sessionId)) {
+  const session = activeSessions.get(req.params.sessionId);
+  if (!session) {
     return res.status(404).json({ success: false, message: 'Session not found' });
   }
-  
-  const session = activeSessions.get(sessionId);
+
   res.json({
     success: true,
     session: {
-      sessionId,
+      sessionId: req.params.sessionId,
       username: session.username,
       authenticated: session.authenticated,
       retrieved: session.retrieved || false,
       analyzed: session.analyzed || false,
-      reportUrl: session.analyzed ? `/api/report/${sessionId}` : null,
+      reportUrl: session.analyzed ? `/api/report/${req.params.sessionId}` : null,
       timestamp: session.timestamp
     }
   });
 });
 
-// Clean up old sessions (run every hour)
+// Auto-clean old sessions every hour
 setInterval(() => {
   const now = new Date();
   for (const [sessionId, session] of activeSessions.entries()) {
-    const timeDiff = now - session.timestamp;
-    if (timeDiff > 3600000) { // 1 hour
+    const age = now - session.timestamp;
+    if (age > 60 * 60 * 1000) {
       fs.remove(session.projectPath).catch(console.error);
-      if (session.reportPath) {
-        fs.remove(session.reportPath).catch(console.error);
-      }
+      if (session.reportPath) fs.remove(session.reportPath).catch(console.error);
       activeSessions.delete(sessionId);
     }
   }
-}, 3600000);
+}, 60 * 60 * 1000);
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
