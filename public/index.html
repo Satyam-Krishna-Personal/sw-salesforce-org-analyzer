@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Salesforce Org Analyzer</title>
     <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -85,7 +87,14 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ env })
                 });
+
+                if (!res.ok) {
+                    const text = await res.text(); // get HTML response
+                    throw new Error(`Server error: ${res.status} ${text.slice(0, 100)}`);
+                }
+
                 const result = await res.json();
+
                 if (result.success) {
                     showStatus('loginStatus', 'Login triggered successfully. Complete in browser then continue.', 'success');
                     showStep(2);
@@ -93,9 +102,10 @@
                     showStatus('loginStatus', result.message, 'error');
                 }
             } catch (e) {
-                showStatus('loginStatus', e.message, 'error');
+                showStatus('loginStatus', 'Login failed: ' + e.message, 'error');
             }
         }
+
 
         async function fetchToken() {
             const alias = document.getElementById('alias').value.trim();

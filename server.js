@@ -221,6 +221,24 @@ app.get('/api/status/:sessionId', (req, res) => {
   });
 });
 
+const { exec } = require('child_process');
+
+app.post('/api/login', async (req, res) => {
+  const { env } = req.body;
+  const alias = env === 'prod' ? 'prod-org' : 'sandbox-org';
+
+  // Trigger Salesforce CLI login command
+  exec(`sf org login web --alias ${alias}`, (err, stdout, stderr) => {
+    if (err) {
+      console.error(`Login error: ${stderr}`);
+      return res.status(500).json({ success: false, message: stderr });
+    }
+
+    console.log(`Login output: ${stdout}`);
+    res.json({ success: true, message: stdout });
+  });
+});
+
 // Auto-clean old sessions every hour
 setInterval(() => {
   const now = new Date();
