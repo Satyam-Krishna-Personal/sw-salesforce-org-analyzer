@@ -1,4 +1,5 @@
-let currentSessionId = '';
+let accessToken = '';
+let instanceUrl = '';
 
 function showStatus(id, message, type = 'info') {
   document.getElementById(id).innerHTML = `<div class="status ${type}">${message}</div>`;
@@ -23,8 +24,10 @@ async function loginHardcoded() {
     const result = await response.json();
 
     if (result.success) {
-      currentSessionId = result.sessionId;
-      showStatus('loginStatus', `✅ Authenticated! Session ID: ${currentSessionId}`, 'success');
+      accessToken = result.accessToken;
+      instanceUrl = result.instanceUrl;
+
+      showStatus('loginStatus', `✅ Authenticated! Org ID: ${result.orgId}`, 'success');
       showStep(2);
     } else {
       showStatus('loginStatus', `❌ Login failed: ${result.message}`, 'error');
@@ -37,8 +40,8 @@ async function loginHardcoded() {
 async function runFullScan() {
   showStatus('scanStatus', 'Running full scan: retrieving metadata & analyzing...', 'loading');
 
-  if (!currentSessionId) {
-    showStatus('scanStatus', 'Session ID missing. Please login first.', 'error');
+  if (!accessToken || !instanceUrl) {
+    showStatus('scanStatus', 'Access token or instance URL missing. Please login first.', 'error');
     return;
   }
 
@@ -46,7 +49,10 @@ async function runFullScan() {
     const response = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: currentSessionId })
+      body: JSON.stringify({
+        accessToken,
+        instanceUrl
+      })
     });
 
     const result = await response.json();
@@ -70,6 +76,6 @@ function viewReport() {
   const reportContainer = document.getElementById('reportContainer');
   reportContainer.innerHTML = `
     <p>Loading report...</p>
-    <iframe src="/api/report/${currentSessionId}" class="report-frame" onload="this.previousElementSibling.style.display='none'"></iframe>
+    <iframe src="/api/report" class="report-frame" onload="this.previousElementSibling.style.display='none'"></iframe>
   `;
 }
