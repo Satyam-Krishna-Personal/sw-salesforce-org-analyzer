@@ -221,8 +221,6 @@ app.get('/api/status/:sessionId', (req, res) => {
   });
 });
 
-const { exec } = require('child_process');
-
 app.post('/api/login', async (req, res) => {
   const { env } = req.body;
   const alias = env === 'prod' ? 'prod-org' : 'sandbox-org';
