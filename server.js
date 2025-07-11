@@ -99,22 +99,51 @@ app.post('/api/analyze', async (req, res) => {
             }
         });
 
-        // Step 3: Create manifest directory and generate manifest
+        // Step 3: Try to generate manifest, if it fails, create a custom one
         const manifestDir = path.join(projectPath, 'manifest');
         await fs.ensureDir(manifestDir);
         
-        const manifestCmd = `sf project generate manifest --from-org ${sessionId} --metadata ApexClass,ApexTrigger,LightningComponentBundle,AuraDefinitionBundle`;
-        await executeCommand(manifestCmd, { cwd: projectPath });
-
-        // Step 4: Verify manifest exists before retrieving
-        const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
-        const manifestExists = await fs.pathExists(manifestPath);
+        let manifestCreated = false;
         
-        if (!manifestExists) {
-            throw new Error(`Manifest file not found at ${manifestPath}. The org might not have the specified metadata types.`);
+        try {
+            const manifestCmd = `sf project generate manifest --from-org ${sessionId} --metadata ApexClass,ApexTrigger,LightningComponentBundle,AuraDefinitionBundle`;
+            await executeCommand(manifestCmd, { cwd: projectPath });
+            
+            const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
+            manifestCreated = await fs.pathExists(manifestPath);
+        } catch (manifestError) {
+            console.log('Manifest generation failed, will create custom manifest:', manifestError.message);
+        }
+        
+        // Step 4: If manifest wasn't created, create a custom one
+        if (!manifestCreated) {
+            const customManifest = `<?xml version="1.0" encoding="UTF-8"?>
+<Package xmlns="http://soap.sforce.com/2006/04/metadata">
+    <types>
+        <members>*</members>
+        <name>ApexClass</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>ApexTrigger</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>LightningComponentBundle</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>AuraDefinitionBundle</name>
+    </types>
+    <version>62.0</version>
+</Package>`;
+            
+            const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
+            await fs.writeFile(manifestPath, customManifest);
+            console.log('Created custom manifest file');
         }
 
-        // Step 5: Retrieve metadata using generated manifest
+        // Step 5: Retrieve metadata using manifest
         const retrieveCmd = `sf project retrieve start --manifest manifest/package.xml --target-org ${sessionId}`;
         await executeCommand(retrieveCmd, { cwd: projectPath });
 
@@ -123,11 +152,23 @@ app.post('/api/analyze', async (req, res) => {
         const forceAppExists = await fs.pathExists(forceAppPath);
         
         if (!forceAppExists) {
-            throw new Error('No metadata retrieved. The org might not contain the specified metadata types.');
+            // Try alternative retrieve approach
+            console.log('No force-app directory found, trying alternative retrieve...');
+            const altRetrieveCmd = `sf project retrieve start --source-dir force-app --target-org ${sessionId}`;
+            try {
+                await executeCommand(altRetrieveCmd, { cwd: projectPath });
+            } catch (altError) {
+                throw new Error(`No metadata retrieved. The org might not contain the specified metadata types. Error: ${altError.message}`);
+            }
         }
 
-        // Step 7: Run scanner
-        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app --projectdir force-app`;
+        // Step 7: Final check and run scanner
+        const finalForceAppCheck = await fs.pathExists(forceAppPath);
+        if (!finalForceAppCheck) {
+            throw new Error('Unable to retrieve any metadata from the org. Please ensure the org contains Apex classes, triggers, or Lightning components.');
+        }
+
+        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app`;
         await executeCommand(scanCmd, { cwd: projectPath });
 
         // Save session info
