@@ -78,7 +78,7 @@
       showStatus('scanStatus', 'Running full scan: retrieving metadata & analyzing...', 'loading');
 
       try {
-        const response = await fetch('/api/full-scan', {
+        const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: currentSessionId })
