@@ -86,12 +86,14 @@ app.post('/api/analyze', async (req, res) => {
         await fs.ensureDir(sessionPath);
         await fs.ensureDir(path.join(__dirname, 'reports'));
 
-        // Step 1: Create new SFDX project
+        // Step 1: Generate SFDX Project
         await executeCommand(`sf project generate --name salesforce-project`, { cwd: sessionPath });
 
-        // Step 2: Authenticate using SF_ACCESS_TOKEN env variable
+        const projectPath = path.join(sessionPath, 'salesforce-project');
+
+        // Step 2: Authenticate using SF_ACCESS_TOKEN
         const loginCommand = `sf org login access-token --instance-url ${instanceUrl} --no-prompt --alias ${sessionId}`;
-        await executeCommand(loginCommand, {
+        await executeCommand(l8oginCommand, {
             cwd: projectPath,
             env: {
                 ...process.env,
@@ -99,14 +101,18 @@ app.post('/api/analyze', async (req, res) => {
             }
         });
 
-        // Step 3: Retrieve metadata from org
-        const retrieveCommand = `sf project retrieve start --target-org ${sessionId}`;
-        await executeCommand(retrieveCommand, { cwd: projectPath });
+        // ✅ Step 3: Generate manifest from org metadata
+        const manifestCmd = `sf project generate manifest --from-org ${sessionId}`;
+        await executeCommand(manifestCmd, { cwd: projectPath });
 
-        // Step 4: Run code analyzer
-        const scanCommand = `sf scanner run --format html --outfile ${reportPath} --target force-app/main/default --projectdir force-app/main/default`;
-        await executeCommand(scanCommand, { cwd: projectPath });
+        // ✅ Step 4: Retrieve all metadata using generated manifest
+        const retrieveCmd = `sf project retrieve start --manifest manifest/package.xml --target-org ${sessionId}`;
+        await executeCommand(retrieveCmd, { cwd: projectPath });
 
+        // Step 5: Run scanner
+        const reportPath = path.join(__dirname, 'reports', `CodeAnalyzerResults_${sessionId}.html`);
+        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app/main/default --projectdir force-app/main/default`;
+        await executeCommand(scanCmd, { cwd: projectPath });
         // Save session info
         activeSessions.set(sessionId, {
             accessToken,
