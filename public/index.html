@@ -10,40 +10,27 @@
   <div class="container">
     <div class="header">
       <h1>🧠 Salesforce Org Analyzer</h1>
-      <p>Run CLI-based Metadata & Code Analysis on your Org</p>
+      <p>Auto-fetch metadata & analyze code quality of your Salesforce org</p>
     </div>
 
     <div class="content">
       <!-- Step 1: Login -->
       <div class="step" id="step1">
         <h2>Step 1: Login to Salesforce Org</h2>
-        <div class="env-buttons">
-          <button class="btn" onclick="loginHardcoded()">Test Login (Hardcoded)</button>
-        </div>
+        <button class="btn" onclick="loginHardcoded()">Login (Hardcoded)</button>
         <div id="loginStatus"></div>
       </div>
 
-      <!-- Step 2: Retrieve Metadata -->
+      <!-- Step 2: Run Analyzer -->
       <div class="step hidden" id="step2">
-        <h2>Step 2: Retrieve Metadata</h2>
-        <div class="form-group">
-          <label for="packageXml">Paste your package.xml:</label>
-          <textarea id="packageXml" placeholder="Insert package.xml here..."></textarea>
-        </div>
-        <button class="btn" onclick="retrieveMetadata()">Retrieve</button>
-        <div id="retrieveStatus"></div>
+        <h2>Step 2: Run Code Scan</h2>
+        <button class="btn" onclick="runFullScan()">Run Full Code Scan</button>
+        <div id="scanStatus"></div>
       </div>
 
-      <!-- Step 3: Run Analysis -->
+      <!-- Step 3: Report -->
       <div class="step hidden" id="step3">
-        <h2>Step 3: Run Code Analyzer</h2>
-        <button class="btn" onclick="analyzeCode()">Run Analyzer</button>
-        <div id="analyzeStatus"></div>
-      </div>
-
-      <!-- Step 4: View Report -->
-      <div class="step hidden" id="step4">
-        <h2>Step 4: View Analysis Report</h2>
+        <h2>Step 3: View Report</h2>
         <button class="btn" onclick="viewReport()">View Report</button>
         <div id="reportContainer"></div>
       </div>
@@ -58,7 +45,7 @@
     }
 
     function showStep(stepNum) {
-      for (let i = 1; i <= 4; i++) {
+      for (let i = 1; i <= 3; i++) {
         document.getElementById(`step${i}`).classList.add('hidden');
       }
       document.getElementById(`step${stepNum}`).classList.remove('hidden');
@@ -87,49 +74,26 @@
       }
     }
 
-    async function retrieveMetadata() {
-      const pkg = document.getElementById('packageXml').value.trim();
-      if (!pkg) {
-        showStatus('retrieveStatus', 'Provide package.xml content', 'error');
-        return;
-      }
+    async function runFullScan() {
+      showStatus('scanStatus', 'Running full scan: retrieving metadata & analyzing...', 'loading');
 
-      showStatus('retrieveStatus', 'Retrieving metadata...', 'loading');
       try {
-        const res = await fetch('/api/retrieve', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: currentSessionId, packageXml: pkg })
-        });
-        const result = await res.json();
-        if (result.success) {
-          showStatus('retrieveStatus', result.message, 'success');
-          showStep(3);
-        } else {
-          showStatus('retrieveStatus', result.message, 'error');
-        }
-      } catch (e) {
-        showStatus('retrieveStatus', e.message, 'error');
-      }
-    }
-
-    async function analyzeCode() {
-      showStatus('analyzeStatus', 'Running analyzer...', 'loading');
-      try {
-        const res = await fetch('/api/analyze', {
+        const response = await fetch('/api/full-scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sessionId: currentSessionId })
         });
-        const result = await res.json();
+
+        const result = await response.json();
+
         if (result.success) {
-          showStatus('analyzeStatus', result.message, 'success');
-          showStep(4);
+          showStatus('scanStatus', `✅ Scan completed. Report ready.`, 'success');
+          showStep(3);
         } else {
-          showStatus('analyzeStatus', result.message, 'error');
+          showStatus('scanStatus', result.message, 'error');
         }
-      } catch (e) {
-        showStatus('analyzeStatus', e.message, 'error');
+      } catch (error) {
+        showStatus('scanStatus', `❌ Error: ${error.message}`, 'error');
       }
     }
 
