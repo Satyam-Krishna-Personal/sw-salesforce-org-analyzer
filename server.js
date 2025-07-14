@@ -241,7 +241,7 @@ const getDirectorySize = async (dirPath) => {
         const stat = await fs.stat(filePath);
 
         if (stat.isDirectory()) {
-            totalSize += await getDirectorySize(filePath);
+            totalSize += await getDirectorySize(filePath); // recursive
         } else {
             totalSize += stat.size;
         }
@@ -249,6 +249,7 @@ const getDirectorySize = async (dirPath) => {
 
     return totalSize;
 };
+
 
 // Serve report
 app.get('/api/report/:sessionId', async (req, res) => {
