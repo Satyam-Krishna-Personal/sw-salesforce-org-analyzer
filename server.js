@@ -83,13 +83,20 @@ app.post('/api/analyze', async (req, res) => {
     const reportPath = path.join(__dirname, 'reports', reportFile);
 
     try {
+        console.log(`Creating directories for session: ${sessionId}`);
         await fs.ensureDir(sessionPath);
         await fs.ensureDir(path.join(__dirname, 'reports'));
+        console.log(`✅ Directories created:
+  - Session: ${sessionPath}
+  - Reports: ${reportPath}`);
 
         // Step 1: Generate SFDX Project
+        console.log('🔧 Generating SFDX project...');
         await executeCommand(`sf project generate --name salesforce-project`, { cwd: sessionPath });
+        console.log(`✅ SFDX project created at: ${projectPath}`);
 
         // Step 2: Authenticate using SF_ACCESS_TOKEN
+        console.log('🔐 Authenticating org using access token...');
         const loginCommand = `sf org login access-token --instance-url ${instanceUrl} --no-prompt --alias ${sessionId}`;
         await executeCommand(loginCommand, {
             cwd: projectPath,
@@ -98,25 +105,29 @@ app.post('/api/analyze', async (req, res) => {
                 SF_ACCESS_TOKEN: accessToken
             }
         });
+        console.log(`✅ Authenticated org: ${instanceUrl} using alias: ${sessionId}`);
 
-        // Step 3: Try to generate manifest, if it fails, create a custom one
+        // Step 3: Generate manifest
         const manifestDir = path.join(projectPath, 'manifest');
         await fs.ensureDir(manifestDir);
 
         let manifestCreated = false;
-
+        console.log('📝 Attempting to generate manifest from org...');
         try {
             const manifestCmd = `sf project generate manifest --from-org ${sessionId} --metadata ApexClass,ApexTrigger,LightningComponentBundle,AuraDefinitionBundle`;
             await executeCommand(manifestCmd, { cwd: projectPath });
 
             const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
             manifestCreated = await fs.pathExists(manifestPath);
+            console.log(`✅ Manifest generated: ${manifestCreated ? manifestPath : '❌ Not found'}`);
         } catch (manifestError) {
-            console.log('Manifest generation failed, will create custom manifest:', manifestError.message);
+            console.log('❌ Manifest generation from org failed, will create custom manifest');
+            console.error(manifestError.message);
         }
 
-        // Step 4: If manifest wasn't created, create a custom one
+        // Step 4: Fallback custom manifest
         if (!manifestCreated) {
+            console.log('🛠️ Creating custom fallback manifest...');
             const customManifest = `<?xml version="1.0" encoding="UTF-8"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <types>
@@ -137,41 +148,46 @@ app.post('/api/analyze', async (req, res) => {
     </types>
     <version>62.0</version>
 </Package>`;
-
             const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
             await fs.writeFile(manifestPath, customManifest);
-            console.log('Created custom manifest file');
+            console.log(`✅ Custom manifest file created at: ${manifestPath}`);
         }
 
-        // Step 5: Retrieve metadata using manifest
+        // Step 5: Retrieve metadata
+        console.log('📦 Retrieving metadata using manifest...');
         const retrieveCmd = `sf project retrieve start --manifest manifest/package.xml --target-org ${sessionId}`;
         await executeCommand(retrieveCmd, { cwd: projectPath });
+        console.log('✅ Metadata retrieval completed');
 
-        // Step 6: Verify force-app directory exists before scanning
+        // Step 6: Check force-app directory
         const forceAppPath = path.join(projectPath, 'force-app');
         const forceAppExists = await fs.pathExists(forceAppPath);
-
+        console.log(`📁 Checking force-app directory: ${forceAppPath}`);
         if (!forceAppExists) {
-            // Try alternative retrieve approach
-            console.log('No force-app directory found, trying alternative retrieve...');
+            console.log('⚠️ force-app directory not found, trying alternative retrieve...');
             const altRetrieveCmd = `sf project retrieve start --source-dir force-app --target-org ${sessionId}`;
             try {
                 await executeCommand(altRetrieveCmd, { cwd: projectPath });
+                console.log('✅ Alternative metadata retrieve successful');
             } catch (altError) {
-                throw new Error(`No metadata retrieved. The org might not contain the specified metadata types. Error: ${altError.message}`);
+                console.error('❌ Alternative retrieve also failed:', altError.message);
+                throw new Error(`No metadata retrieved. Org may not contain specified metadata types. Error: ${altError.message}`);
             }
         }
 
-        // Step 7: Final check and run scanner
+        // Final force-app check
         const finalForceAppCheck = await fs.pathExists(forceAppPath);
         if (!finalForceAppCheck) {
-            throw new Error('Unable to retrieve any metadata from the org. Please ensure the org contains Apex classes, triggers, or Lightning components.');
+            throw new Error('❌ force-app directory still missing after retrieval. Metadata might be missing.');
         }
 
-        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app`;
+        // Step 7: Run code analyzer
+        console.log('🧪 Running code scan on retrieved metadata...');
+        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app\\main\\default`;
         await executeCommand(scanCmd, { cwd: projectPath });
+        console.log(`✅ Code scan complete. Report generated at: ${reportPath}`);
 
-        // Save session info
+        // Save session
         activeSessions.set(sessionId, {
             accessToken,
             instanceUrl,
@@ -183,7 +199,6 @@ app.post('/api/analyze', async (req, res) => {
             timestamp: new Date()
         });
 
-        // Response
         res.json({
             success: true,
             sessionId,
@@ -196,14 +211,16 @@ app.post('/api/analyze', async (req, res) => {
         try {
             if (await fs.pathExists(sessionPath)) {
                 await fs.remove(sessionPath);
+                console.log(`🧹 Cleaned up session directory: ${sessionPath}`);
             }
         } catch (cleanupError) {
-            console.error('Error during cleanup:', cleanupError);
+            console.error('🛑 Error during cleanup:', cleanupError);
         }
 
+        console.error('🚨 Analyzer failed:', err.message);
         res.status(500).json({
             success: false,
-            message: 'Analyzer failed' + (err.error || err.message),
+            message: 'Analyzer failed: ' + (err.error || err.message),
             error: err.error || err.message,
             stderr: err.stderr
         });
