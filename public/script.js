@@ -74,10 +74,15 @@ async function runFullScan() {
   }
 }
 
-function viewReport(reportId) {
+function viewReport(id = reportId) {
+  if (!id || id === 'undefined') {
+    showStatus('scanStatus', 'Report ID is missing or invalid.', 'error');
+    return;
+  }
+
   const reportContainer = document.getElementById('reportContainer');
   reportContainer.innerHTML = `
     <p id="loadingMsg">Loading report...</p>
-    <iframe src="/api/report/${reportId}" class="report-frame" onload="document.getElementById('loadingMsg').style.display='none'"></iframe>
+    <iframe src="/api/report/${id}" class="report-frame" onload="document.getElementById('loadingMsg').style.display='none'"></iframe>
   `;
 }
