@@ -231,6 +231,25 @@ app.post('/api/analyze', async (req, res) => {
     }
 });
 
+const getDirectorySize = async (dirPath) => {
+    let totalSize = 0;
+
+    const files = await fs.readdir(dirPath);
+
+    for (const file of files) {
+        const filePath = path.join(dirPath, file);
+        const stat = await fs.stat(filePath);
+
+        if (stat.isDirectory()) {
+            totalSize += await getDirectorySize(filePath);
+        } else {
+            totalSize += stat.size;
+        }
+    }
+
+    return totalSize;
+};
+
 // Serve report
 app.get('/api/report/:sessionId', async (req, res) => {
     const session = activeSessions.get(req.params.sessionId);
