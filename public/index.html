@@ -4,9 +4,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Salesforce Org Analyzer - Saasworx</title>
-  <link rel="stylesheet" href="style.css" />
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <title>Salesforce Org Analyzer | Saasworx</title>
+  <meta name="description" content="Analyze your Salesforce org's metadata and code quality">
+
+  <!-- Favicon -->
+  <link rel="icon" href="https://saasworx.com/favicon.ico" type="image/x-icon">
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
@@ -30,8 +41,8 @@
           <span class="company-name">Saasworx</span>
         </div>
         <div class="app-title">
-          <h1><i class="fas fa-brain"></i> Salesforce Org Analyzer</h1>
-          <p>Auto-fetch metadata & analyze code quality of your Salesforce org</p>
+          <h1>Salesforce Org Analyzer</h1>
+          <p>Comprehensive analysis of your Salesforce metadata and code quality</p>
         </div>
       </div>
       <div class="made-by">
@@ -44,26 +55,26 @@
       <div class="screen active" id="environmentScreen">
         <div class="screen-content">
           <div class="welcome-section">
-            <h2>Select Salesforce Environment</h2>
-            <p>Choose your Salesforce environment to get started with the analysis</p>
+            <h2>Welcome to Salesforce Org Analyzer</h2>
+            <p>Select your Salesforce environment to begin analyzing your org's metadata and code quality</p>
           </div>
 
           <div class="environment-grid">
             <div class="env-card" onclick="selectEnvironment('production')">
-              <div class="env-icon production">
+              <div class="env-icon">
                 <i class="fas fa-building"></i>
               </div>
               <h3>Production</h3>
-              <p>Live production environment</p>
+              <p>Analyze your live production environment</p>
               <div class="status-badge coming-soon">Coming Soon</div>
             </div>
 
             <div class="env-card" onclick="selectEnvironment('sandbox')">
-              <div class="env-icon sandbox">
+              <div class="env-icon">
                 <i class="fas fa-flask"></i>
               </div>
               <h3>Sandbox</h3>
-              <p>Development/testing environment</p>
+              <p>Analyze your development or testing environment</p>
               <div class="status-badge coming-soon">Coming Soon</div>
             </div>
           </div>
@@ -76,7 +87,7 @@
               <i class="fas fa-key"></i>
               Test Login
             </button>
-            <p class="test-description">Use test credentials to explore the analyzer</p>
+            <p class="test-description">Use demo credentials to explore the analyzer</p>
           </div>
         </div>
       </div>
@@ -85,7 +96,7 @@
       <div class="screen" id="dashboardScreen">
         <div class="screen-content">
           <div class="dashboard-header">
-            <h2>Salesforce Org Analyzer Dashboard</h2>
+            <h2>Org Analysis Dashboard</h2>
             <div class="org-info" id="orgInfo"></div>
           </div>
 
@@ -96,7 +107,7 @@
               </div>
               <div class="feature-content">
                 <h3>Code Analyzer</h3>
-                <p>Analyze your Apex code quality, identify issues, and get recommendations</p>
+                <p>Comprehensive analysis of Apex code quality, best practices, and performance</p>
                 <div class="feature-status available">Available</div>
               </div>
               <div class="feature-arrow">
@@ -143,11 +154,12 @@
       <!-- Analysis Screen -->
       <div class="screen" id="analysisScreen">
         <div class="screen-content">
+          <button class="btn btn-secondary btn-back" onclick="showScreen('dashboardScreen')">
+            <i class="fas fa-arrow-left"></i>
+            Back to Dashboard
+          </button>
+
           <div class="analysis-header">
-            <button class="btn btn-secondary btn-back" onclick="showScreen('dashboardScreen')">
-              <i class="fas fa-arrow-left"></i>
-              Back to Dashboard
-            </button>
             <h2>Code Analysis</h2>
           </div>
 
@@ -185,11 +197,12 @@
       <!-- Report Screen -->
       <div class="screen" id="reportScreen">
         <div class="screen-content">
+          <button class="btn btn-secondary btn-back" onclick="showScreen('analysisScreen')">
+            <i class="fas fa-arrow-left"></i>
+            Back to Analysis
+          </button>
+
           <div class="report-header">
-            <button class="btn btn-secondary btn-back" onclick="showScreen('analysisScreen')">
-              <i class="fas fa-arrow-left"></i>
-              Back to Analysis
-            </button>
             <h2>Analysis Report</h2>
           </div>
 
