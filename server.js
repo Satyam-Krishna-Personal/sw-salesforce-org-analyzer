@@ -176,32 +176,20 @@ app.post('/api/analyze', async (req, res) => {
             }
         }
 
-        // Step 6.1: Size check and file count
+        // Step 6.1: Size check
         const finalForceAppCheck = await fs.pathExists(forceAppPath);
         if (!finalForceAppCheck) {
             throw new Error('❌ force-app directory still missing after retrieval. Metadata might be missing.');
         }
-
-        // Get file count and size
-        const { size: metadataSizeBytes, fileCount } = await getDirectorySizeAndCount(forceAppPath);
+        const metadataSizeBytes = await getDirectorySize(forceAppPath);
         const metadataSizeKB = (metadataSizeBytes / 1024).toFixed(2);
-        console.log(`📊 Retrieved metadata: ${fileCount} files, ${metadataSizeKB} KB`);
-
-        if (fileCount === 0) {
-            throw new Error('❌ No files retrieved from org. Please check if the org contains the specified metadata types.');
-        }
+        console.log(`📊 Retrieved metadata size: ${metadataSizeKB} KB`);
 
         // Step 7: Run code analyzer
         console.log('🧪 Running code scan on retrieved metadata...');
-        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target "${path.join(projectPath, 'force-app')}"`;
+        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app\main\default`;
         await executeCommand(scanCmd, { cwd: projectPath });
         console.log(`✅ Code scan complete. Report generated at: ${reportPath}`);
-
-        // Verify report was created
-        const reportExists = await fs.pathExists(reportPath);
-        if (!reportExists) {
-            throw new Error('❌ Scan completed but report file was not created');
-        }
 
         // Save session
         activeSessions.set(sessionId, {
@@ -212,18 +200,14 @@ app.post('/api/analyze', async (req, res) => {
             reportPath,
             reportFile,
             analyzed: true,
-            timestamp: new Date(),
-            fileCount,
-            metadataSizeKB
+            timestamp: new Date()
         });
 
         res.json({
             success: true,
             sessionId,
             reportUrl: `/api/report/${sessionId}`,
-            message: 'Code scan completed and report generated',
-            fileCount,
-            metadataSizeKB
+            message: 'Code scan completed and report generated'
         });
 
     } catch (err) {
@@ -246,29 +230,6 @@ app.post('/api/analyze', async (req, res) => {
         });
     }
 });
-
-// Helper function to get directory size and file count
-async function getDirectorySizeAndCount(dir) {
-    let size = 0;
-    let fileCount = 0;
-
-    const files = await fs.readdir(dir);
-    for (const file of files) {
-        const filePath = path.join(dir, file);
-        const stat = await fs.stat(filePath);
-
-        if (stat.isDirectory()) {
-            const subDirStats = await getDirectorySizeAndCount(filePath);
-            size += subDirStats.size;
-            fileCount += subDirStats.fileCount;
-        } else {
-            size += stat.size;
-            fileCount++;
-        }
-    }
-
-    return { size, fileCount };
-}
 
 const getDirectorySize = async (dirPath) => {
     let totalSize = 0;
