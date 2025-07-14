@@ -168,7 +168,7 @@ app.post('/api/analyze', async (req, res) => {
             throw new Error('Unable to retrieve any metadata from the org. Please ensure the org contains Apex classes, triggers, or Lightning components.');
         }
 
-        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app\main\default`;
+        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app`;
         await executeCommand(scanCmd, { cwd: projectPath });
 
         // Save session info
