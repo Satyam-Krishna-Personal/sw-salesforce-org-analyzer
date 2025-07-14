@@ -163,6 +163,7 @@ app.post('/api/analyze', async (req, res) => {
         const forceAppPath = path.join(projectPath, 'force-app');
         const forceAppExists = await fs.pathExists(forceAppPath);
         console.log(`📁 Checking force-app directory: ${forceAppPath}`);
+
         if (!forceAppExists) {
             console.log('⚠️ force-app directory not found, trying alternative retrieve...');
             const altRetrieveCmd = `sf project retrieve start --source-dir force-app --target-org ${sessionId}`;
@@ -175,15 +176,18 @@ app.post('/api/analyze', async (req, res) => {
             }
         }
 
-        // Final force-app check
+        // Step 6.1: Size check
         const finalForceAppCheck = await fs.pathExists(forceAppPath);
         if (!finalForceAppCheck) {
             throw new Error('❌ force-app directory still missing after retrieval. Metadata might be missing.');
         }
+        const metadataSizeBytes = await getDirectorySize(forceAppPath);
+        const metadataSizeKB = (metadataSizeBytes / 1024).toFixed(2);
+        console.log(`📊 Retrieved metadata size: ${metadataSizeKB} KB`);
 
         // Step 7: Run code analyzer
         console.log('🧪 Running code scan on retrieved metadata...');
-        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app\\main\\default`;
+        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app\main\default`;
         await executeCommand(scanCmd, { cwd: projectPath });
         console.log(`✅ Code scan complete. Report generated at: ${reportPath}`);
 
