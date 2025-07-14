@@ -1,5 +1,6 @@
 let accessToken = '';
 let instanceUrl = '';
+let reportId = '';
 
 function showStatus(id, message, type = 'info') {
   document.getElementById(id).innerHTML = `<div class="status ${type}">${message}</div>`;
@@ -63,6 +64,7 @@ async function runFullScan() {
         `✅ Scan completed. <a href="${result.reportUrl}" target="_blank">View Report</a>`,
         'success'
       );
+      reportId = result.sessionId;
       showStep(3);
     } else {
       showStatus('scanStatus', result.message || 'Scan failed', 'error');
@@ -72,10 +74,10 @@ async function runFullScan() {
   }
 }
 
-function viewReport() {
+function viewReport(reportId) {
   const reportContainer = document.getElementById('reportContainer');
   reportContainer.innerHTML = `
-    <p>Loading report...</p>
-    <iframe src="/api/report" class="report-frame" onload="this.previousElementSibling.style.display='none'"></iframe>
+    <p id="loadingMsg">Loading report...</p>
+    <iframe src="/api/report/${reportId}" class="report-frame" onload="document.getElementById('loadingMsg').style.display='none'"></iframe>
   `;
 }
