@@ -20,7 +20,7 @@ const activeSessions = new Map();
 // Utility: CLI command executor
 const executeCommand = async (cmd, options = {}) => {
     return new Promise((resolve, reject) => {
-        exec(cmd, { ...options, shell: '/bin/bash' }, (error, stdout, stderr) => {
+        exec(cmd, { ...options, shell: '/bin/sh' }, (error, stdout, stderr) => {
             if (error) {
                 error.stdout = stdout;
                 error.stderr = stderr;
@@ -130,11 +130,20 @@ app.post('/api/analyze', async (req, res) => {
 
         // Step 5: Run scanner
         console.log('🧪 Running code scan...');
-        const scanCmd = `sf scanner run --format html --outfile "${reportPath}" --target "${path.join('myapp', 'main', 'default')}"`;
         try {
-            const scanResult = await executeCommand(scanCmd, { cwd: projectPath });
-            console.log(`✅ Code scan complete. Report at: ${reportPath}`);
-            console.log(`🔎 Scanner output:\n${scanResult}`);
+            console.log('🧪 Running code scan on retrieved metadata...');
+            const scanCmd = `sf code-analyzer run \
+                            --rule-selector Recommended \
+                            --workspace . \
+                            --target myapp/main/default \
+                            --view detail \
+                            --output-file "${reportPath}"`;
+
+            await executeCommand(scanCmd, {
+                cwd: projectPath,
+                shell: '/bin/sh'
+            });
+            console.log(`✅ Code scan complete. Report generated at: ${reportPath}`);
         } catch (scanErr) {
             console.error('❌ Scanner failed:', scanErr.stderr || scanErr.message || scanErr);
             throw new Error(`Scanner failed: ${scanErr.stderr || scanErr.message || scanErr}`);
