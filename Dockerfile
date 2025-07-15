@@ -34,9 +34,10 @@ RUN cd /usr/src && \
     python3 --version && python --version && pip3 --version && \
     cd .. && rm -rf Python-3.10.14 Python-3.10.14.tgz
 
-# Set JAVA_HOME
+# Set JAVA environment
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 ENV PATH="${JAVA_HOME}/bin:${PATH}"
+ENV JAVA_TOOL_OPTIONS="-Xmx2048m"
 
 # Install Salesforce CLI
 RUN npm install --global @salesforce/cli
