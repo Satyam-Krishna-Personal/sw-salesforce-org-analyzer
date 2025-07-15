@@ -154,21 +154,13 @@ app.post('/api/analyze', async (req, res) => {
             const htmlReportPath = path.join(reportDir, `CodeAnalyzerResults_${sessionId}.html`);
 
             const scanCmd = `sf code-analyzer run \
-                                --rule-selector all \
-                                --workspace . \
-                                --target myapp/main/default \
-                                --engines eslint,pmd \
-                                --view detail \
-                                --format csv \
-                                --output-file "${csvReportPath}" && \
-                            sf code-analyzer run \
-                                --rule-selector all \
-                                --workspace . \
-                                --target myapp/main/default \
-                                --engines eslint,pmd \
-                                --view detail \
-                                --format html \
-                                --output-file "${htmlReportPath}" `;
+                            --rule-selector all \
+                            --engine eslint \
+                            --engine pmd \
+                            --workspace . \
+                            --target myapp/main/default \
+                            --view detail \
+                            --output-file "${reportPath}"`;
 
             await executeCommand(scanCmd, {
                 cwd: projectPath,
