@@ -154,8 +154,6 @@ app.post('/api/analyze', async (req, res) => {
             const htmlReportPath = path.join(reportDir, `CodeAnalyzerResults_${sessionId}.html`);
 
             const scanCmd = `sf code-analyzer run \
-                            --engine pmd \
-                            --engine eslint \
                             --rule-selector pmd:ApexRules \
                             --rule-selector eslint:Recommended \
                             --workspace . \
