@@ -133,7 +133,8 @@ app.post('/api/analyze', async (req, res) => {
         try {
             console.log('🧪 Running code scan on retrieved metadata...');
             const scanCmd = `sf code-analyzer run \
-                            --rule-selector Recommended \
+                            --rule-selector eslint:Recommended \
+                            --rule-selector pmd:Recommended \
                             --workspace . \
                             --target myapp/main/default \
                             --view detail \
