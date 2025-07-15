@@ -18,14 +18,15 @@ app.use(express.static('public'));
 const activeSessions = new Map();
 
 // Utility: CLI command executor
-const executeCommand = (command, options = {}) => {
+const executeCommand = async (cmd, options = {}) => {
     return new Promise((resolve, reject) => {
-        exec(command, options, (error, stdout, stderr) => {
+        exec(cmd, { ...options, shell: '/bin/bash' }, (error, stdout, stderr) => {
             if (error) {
-                reject({ error: error.message, stderr });
-            } else {
-                resolve({ stdout, stderr });
+                error.stdout = stdout;
+                error.stderr = stderr;
+                return reject(error);
             }
+            resolve(stdout);
         });
     });
 };
