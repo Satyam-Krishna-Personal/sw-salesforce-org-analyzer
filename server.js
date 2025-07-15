@@ -200,7 +200,7 @@ app.post('/api/analyze', async (req, res) => {
         // Step 7: Run code analyzer
         console.log('🧪 Running code scan on retrieved metadata...');
         const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app\main\default`;
-        await executeCommand(scanCmd, { cwd: projectPath });
+        await executeCommand(scanCmd, { cwd: forceAppDefaultPath });
         console.log(`✅ Code scan complete. Report generated at: ${reportPath}`);
 
         // Save session
