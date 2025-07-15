@@ -165,11 +165,7 @@ app.post('/api/analyze', async (req, res) => {
                 cwd: projectPath,
                 shell: '/bin/sh'
             });
-
-            console.log(`✅ Code scan complete. Reports generated:\n📄 CSV: ${csvReportPath}\n🌐 HTML: ${htmlReportPath}`);
-
-            // Update reportPath to HTML report (for UI view)
-            reportPath = htmlReportPath;
+            console.log(`✅ Code scan complete. Report generated at: ${reportPath}`);
 
         } catch (scanErr) {
             console.error('❌ Scanner failed:', scanErr.stderr || scanErr.message || scanErr);
