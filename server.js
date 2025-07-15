@@ -139,18 +139,47 @@ app.post('/api/analyze', async (req, res) => {
         console.log('🧪 Running code scan...');
         try {
             console.log('🧪 Running code scan on retrieved metadata...');
+
+            // Old full scan command (can enable in future):
+            // const scanCmd = `sf code-analyzer run \
+            //                 --rule-selector all \
+            //                 --workspace . \
+            //                 --target myapp/main/default \
+            //                 --view detail \
+            //                 --output-file "${reportPath}"`;
+
+            // ⚠️ New memory-optimized scan (eslint + pmd) with both CSV and HTML output
+            const reportDir = path.join(__dirname, 'reports');
+            const csvReportPath = path.join(reportDir, `CodeAnalyzerResults_${sessionId}.csv`);
+            const htmlReportPath = path.join(reportDir, `CodeAnalyzerResults_${sessionId}.html`);
+
             const scanCmd = `sf code-analyzer run \
-                            --rule-selector all \
-                            --workspace . \
-                            --target myapp/main/default \
-                            --view detail \
-                            --output-file "${reportPath}"`;
+                                --rule-selector all \
+                                --workspace . \
+                                --target myapp/main/default \
+                                --engines eslint,pmd \
+                                --view detail \
+                                --format csv \
+                                --output-file "${csvReportPath}" && \
+                            sf code-analyzer run \
+                                --rule-selector all \
+                                --workspace . \
+                                --target myapp/main/default \
+                                --engines eslint,pmd \
+                                --view detail \
+                                --format html \
+                                --output-file "${htmlReportPath}" `;
 
             await executeCommand(scanCmd, {
                 cwd: projectPath,
                 shell: '/bin/sh'
             });
-            console.log(`✅ Code scan complete. Report generated at: ${reportPath}`);
+
+            console.log(`✅ Code scan complete. Reports generated:\n📄 CSV: ${csvReportPath}\n🌐 HTML: ${htmlReportPath}`);
+
+            // Update reportPath to HTML report (for UI view)
+            reportPath = htmlReportPath;
+
         } catch (scanErr) {
             console.error('❌ Scanner failed:', scanErr.stderr || scanErr.message || scanErr);
             throw new Error(`Scanner failed: ${scanErr.stderr || scanErr.message || scanErr}`);
