@@ -1,5 +1,5 @@
 # Use Node.js with Debian base for better compatibility
-FROM node:18-bullseye
+FROM node:20.14.0-bullseye
 
 # Set environment variables
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
