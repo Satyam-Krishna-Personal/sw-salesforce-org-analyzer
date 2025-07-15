@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y \
     libbz2-dev \
     libreadline-dev \
     libsqlite3-dev \
-    openjdk-11-jre-headless \
+    openjdk-11-jdk \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python 3.10 from source (safe and guaranteed for Debian)

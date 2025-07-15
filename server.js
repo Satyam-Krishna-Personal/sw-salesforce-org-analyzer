@@ -153,6 +153,8 @@ app.post('/api/analyze', async (req, res) => {
             const csvReportPath = path.join(reportDir, `CodeAnalyzerResults_${sessionId}.csv`);
             const htmlReportPath = path.join(reportDir, `CodeAnalyzerResults_${sessionId}.html`);
 
+            process.env.JAVA_TOOL_OPTIONS = '-Xmx512m'; // Limit Java heap to prevent PMD crashes
+            
             const scanCmd = `sf code-analyzer run \
                             --rule-selector PMD,ESLint \
                             --workspace . \
