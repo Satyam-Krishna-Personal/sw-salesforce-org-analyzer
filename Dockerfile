@@ -1,11 +1,7 @@
-# Use Node.js with Debian base for better compatibility
-FROM node:20.14.0-bullseye
+# Use Node.js 20 base image (required for code-analyzer v5+)
+FROM node:20-bullseye
 
-# Set environment variables
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-ENV NODE_ENV=production
-
-# Install system dependencies including Python 3.10 for Flow engine
+# Install required system dependencies
 RUN apt-get update && apt-get install -y \
     curl \
     git \
@@ -15,30 +11,38 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-venv \
     python3-dev \
+    python3-pip \
     && ln -sf /usr/bin/python3 /usr/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/bin/pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Salesforce CLI globally
-RUN npm install -g @salesforce/cli
+# Set environment variables
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
-# Install Salesforce Code Analyzer plugin v5.2.2
+# Install Salesforce CLI
+RUN npm install --global @salesforce/cli
+
+# Install Salesforce Code Analyzer v5.2.2
 RUN sf plugins install code-analyzer@5.2.2
 
 # Set working directory
 WORKDIR /usr/src/app
 
-# Copy package files and install production dependencies only
+# Copy dependency files
 COPY package*.json ./
-RUN npm install --omit=dev
 
-# Copy application code
+# Install Node.js dependencies
+RUN npm install
+
+# Copy source code
 COPY . .
 
 # Create required directories
 RUN mkdir -p /usr/src/app/projects /usr/src/app/temp /usr/src/app/reports
 
-# Expose the application port
+# Expose port
 EXPOSE 3000
 
-# Start the Node.js app
+# Start application
 CMD ["npm", "start"]
