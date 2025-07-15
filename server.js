@@ -1,5 +1,5 @@
 const express = require('express');
-const { exec } = require('child_process');
+const { exec, execSync } = require('child_process');
 const fs = require('fs-extra');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
@@ -127,6 +127,13 @@ app.post('/api/analyze', async (req, res) => {
         }
 
         console.log(`✅ Metadata directory size: ${metadataSizeKB} KB`);
+
+        try {
+            const pythonVersion = execSync('python3 --version', { encoding: 'utf-8' }).trim();
+            console.log('🐍 Python Version:', pythonVersion);
+        } catch (err) {
+            console.error('❌ Failed to get Python version:', err.message);
+        }
 
         // Step 5: Run scanner
         console.log('🧪 Running code scan...');

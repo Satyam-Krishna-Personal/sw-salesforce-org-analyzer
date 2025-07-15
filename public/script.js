@@ -162,11 +162,11 @@ async function runFullScan() {
       }, 2000);
     } else {
       updateProgress(0, 'Analysis failed. Please try again.');
-      showToast(result.message || 'Analysis failed', 'error', 6000);
+      showToast(result.message || 'Analysis failed', 'error', 10000);
     }
   } catch (error) {
     updateProgress(0, 'Analysis failed due to an error.');
-    showToast(`Analysis error: ${error.message}`, 'error', 6000);
+    showToast(`Analysis error: ${error.message}`, 'error', 10000);
   } finally {
     // Re-enable button
     scanButton.disabled = false;
