@@ -78,7 +78,7 @@ app.post('/api/analyze', async (req, res) => {
 
     const sessionId = uuidv4();
     const sessionPath = path.join(__dirname, 'projects', sessionId);
-    const projectPath = path.join(sessionPath, 'salesforce-project');
+    const projectPath = path.join(sessionPath, 'sfproject');
     const reportFile = `CodeAnalyzerResults_${sessionId}.html`;
     const reportPath = path.join(__dirname, 'reports', reportFile);
 
@@ -90,9 +90,9 @@ app.post('/api/analyze', async (req, res) => {
   - Session: ${sessionPath}
   - Reports: ${reportPath}`);
 
-        // Step 1: Generate SFDX Project
+        // Step 1: Generate SFDX Project with correct command structure
         console.log('🔧 Generating SFDX project...');
-        await executeCommand(`sf project generate --name salesforce-project`, { cwd: sessionPath });
+        await executeCommand(`sf project generate --name sfproject --default-package-dir myapp --manifest`, { cwd: sessionPath });
         console.log(`✅ SFDX project created at: ${projectPath}`);
 
         // Step 2: Authenticate using SF_ACCESS_TOKEN
@@ -107,27 +107,28 @@ app.post('/api/analyze', async (req, res) => {
         });
         console.log(`✅ Authenticated org: ${instanceUrl} using alias: ${sessionId}`);
 
-        // Step 3: Generate manifest
+        // Step 3: Generate comprehensive manifest to retrieve ALL metadata
         const manifestDir = path.join(projectPath, 'manifest');
         await fs.ensureDir(manifestDir);
 
         let manifestCreated = false;
         console.log('📝 Attempting to generate manifest from org...');
         try {
-            const manifestCmd = `sf project generate manifest --from-org ${sessionId} --metadata ApexClass,ApexTrigger,LightningComponentBundle,AuraDefinitionBundle`;
+            // Generate manifest for all metadata types
+            const manifestCmd = `sf project generate manifest --from-org ${sessionId}`;
             await executeCommand(manifestCmd, { cwd: projectPath });
 
             const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
             manifestCreated = await fs.pathExists(manifestPath);
             console.log(`✅ Manifest generated: ${manifestCreated ? manifestPath : '❌ Not found'}`);
         } catch (manifestError) {
-            console.log('❌ Manifest generation from org failed, will create custom manifest');
+            console.log('❌ Manifest generation from org failed, will create comprehensive manifest');
             console.error(manifestError.message);
         }
 
-        // Step 4: Fallback custom manifest
+        // Step 4: Fallback comprehensive manifest with all metadata types
         if (!manifestCreated) {
-            console.log('🛠️ Creating custom fallback manifest...');
+            console.log('🛠️ Creating comprehensive fallback manifest...');
             const customManifest = `<?xml version="1.0" encoding="UTF-8"?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
     <types>
@@ -146,62 +147,132 @@ app.post('/api/analyze', async (req, res) => {
         <members>*</members>
         <name>AuraDefinitionBundle</name>
     </types>
+    <types>
+        <members>*</members>
+        <name>Flow</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>CustomObject</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>CustomField</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>ValidationRule</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>WorkflowRule</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>PermissionSet</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>Profile</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>CustomTab</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>CustomApplication</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>Layout</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>Report</name>
+    </types>
+    <types>
+        <members>*</members>
+        <name>Dashboard</name>
+    </types>
     <version>62.0</version>
 </Package>`;
             const manifestPath = path.join(projectPath, 'manifest', 'package.xml');
             await fs.writeFile(manifestPath, customManifest);
-            console.log(`✅ Custom manifest file created at: ${manifestPath}`);
+            console.log(`✅ Comprehensive manifest file created at: ${manifestPath}`);
         }
 
-        // Step 5: Retrieve metadata
-        console.log('📦 Retrieving metadata using manifest...');
+        // Step 4: Retrieve ALL metadata using the auto-generated manifest
+        console.log('📦 Retrieving complete metadata using auto-generated manifest...');
         const retrieveCmd = `sf project retrieve start --manifest manifest/package.xml --target-org ${sessionId}`;
         await executeCommand(retrieveCmd, { cwd: projectPath });
-        console.log('✅ Metadata retrieval completed');
+        console.log('✅ Complete metadata retrieval completed');
 
-        // Step 6: Check force-app directory
-        const forceAppPath = path.join(projectPath, 'force-app');
-        const forceAppExists = await fs.pathExists(forceAppPath);
-        console.log(`📁 Checking force-app directory: ${forceAppPath}`);
+        // Step 5: Check myapp directory (default package directory)
+        const myappPath = path.join(projectPath, 'myapp');
+        const myappExists = await fs.pathExists(myappPath);
+        console.log(`📁 Checking myapp directory: ${myappPath}`);
 
-        if (!forceAppExists) {
-            console.log('⚠️ force-app directory not found, trying alternative retrieve...');
-            const altRetrieveCmd = `sf project retrieve start --source-dir force-app --target-org ${sessionId}`;
-            try {
-                await executeCommand(altRetrieveCmd, { cwd: projectPath });
-                console.log('✅ Alternative metadata retrieve successful');
-            } catch (altError) {
-                console.error('❌ Alternative retrieve also failed:', altError.message);
-                throw new Error(`No metadata retrieved. Org may not contain specified metadata types. Error: ${altError.message}`);
+        if (!myappExists) {
+            console.log('⚠️ myapp directory not found, checking force-app...');
+            const forceAppPath = path.join(projectPath, 'force-app');
+            const forceAppExists = await fs.pathExists(forceAppPath);
+            
+            if (!forceAppExists) {
+                console.log('⚠️ force-app directory not found, trying alternative retrieve...');
+                const altRetrieveCmd = `sf project retrieve start --source-dir myapp --target-org ${sessionId}`;
+                try {
+                    await executeCommand(altRetrieveCmd, { cwd: projectPath });
+                    console.log('✅ Alternative metadata retrieve successful');
+                } catch (altError) {
+                    console.error('❌ Alternative retrieve also failed:', altError.message);
+                    throw new Error(`No metadata retrieved. Org may not contain specified metadata types. Error: ${altError.message}`);
+                }
             }
         }
 
-        // Step 6.1: Size check
-        const finalForceAppCheck = await fs.pathExists(forceAppPath);
-        if (!finalForceAppCheck) {
-            throw new Error('❌ force-app directory still missing after retrieval. Metadata might be missing.');
-        }
+        // Step 5.1: Determine the correct source directory
+        let sourceDir = myappPath;
+        let sourceDirExists = await fs.pathExists(myappPath);
         
-        const forceAppDefaultPath = path.join(forceAppPath, 'main', 'default');
-        const metadataSizeBytes = await getDirectorySize(forceAppPath);
+        if (!sourceDirExists) {
+            sourceDir = path.join(projectPath, 'force-app');
+            sourceDirExists = await fs.pathExists(sourceDir);
+        }
+
+        if (!sourceDirExists) {
+            throw new Error('❌ Neither myapp nor force-app directory exists after retrieval. Metadata might be missing.');
+        }
+
+        // Step 5.2: Size check
+        const metadataSizeBytes = await getDirectorySize(sourceDir);
         const metadataSizeKB = (metadataSizeBytes / 1024).toFixed(2);
         console.log(`📊 Retrieved metadata size: ${metadataSizeKB} KB`);
 
-        const forceAppDefaultPathMetadataSizeBytes = await getDirectorySize(forceAppDefaultPath);
-        const forceAppDefaultPathMetadataSizeKB = (forceAppDefaultPathMetadataSizeBytes / 1024).toFixed(2);
-        console.log(`📊 force-app/main/default metadata size: ${forceAppDefaultPathMetadataSizeKB} KB`);
-        if (forceAppDefaultPathMetadataSizeKB < 1) {
-            throw new Error('❌ force-app/main/default directory is empty or too small. No metadata retrieved.');
+        if (metadataSizeKB < 1) {
+            throw new Error(`❌ Source directory is empty or too small. No metadata retrieved. Directory: ${sourceDir}`);
         }
-        console.log(`✅ force-app/main/default directory exists with size: ${forceAppDefaultPathMetadataSizeKB} KB`);
-        console.log(`📂 Metadata retrieved successfully at: ${forceAppPath}`)
-        console.log(`📂 Metadata retrieved successfully at: ${forceAppDefaultPath}`);
+        console.log(`✅ Source directory exists with size: ${metadataSizeKB} KB`);
+        console.log(`📂 Metadata retrieved successfully at: ${sourceDir}`);
 
-        // Step 7: Run code analyzer
-        console.log('🧪 Running code scan on retrieved metadata...');
-        const scanCmd = `sf scanner run --format html --outfile ${reportPath} --target force-app\main\default`;
-        await executeCommand(scanCmd, { cwd: forceAppPath });
+        // Step 6: Run code analyzer on ALL retrieved files
+        console.log('🧪 Running code scan on ALL retrieved metadata...');
+        
+        // Get relative path for scanner command
+        const relativeSourcePath = path.relative(projectPath, sourceDir);
+        const scanCmd = `sf scanner run --format html --outfile "${reportPath}" --target "${relativeSourcePath}"`;
+        
+        console.log(`Scanner command: ${scanCmd}`);
+        console.log(`Working directory: ${projectPath}`);
+        
+        await executeCommand(scanCmd, { cwd: projectPath });
         console.log(`✅ Code scan complete. Report generated at: ${reportPath}`);
+
+        // Verify report was created
+        const reportExists = await fs.pathExists(reportPath);
+        if (!reportExists) {
+            throw new Error(`❌ Report file was not created at: ${reportPath}`);
+        }
 
         // Save session
         activeSessions.set(sessionId, {
@@ -211,6 +282,7 @@ app.post('/api/analyze', async (req, res) => {
             sfProjectPath: projectPath,
             reportPath,
             reportFile,
+            sourceDir,
             analyzed: true,
             timestamp: new Date()
         });
@@ -219,7 +291,9 @@ app.post('/api/analyze', async (req, res) => {
             success: true,
             sessionId,
             reportUrl: `/api/report/${sessionId}`,
-            message: 'Code scan completed and report generated'
+            message: 'Code scan completed and report generated',
+            metadataSize: `${metadataSizeKB} KB`,
+            sourceDirectory: sourceDir
         });
 
     } catch (err) {
