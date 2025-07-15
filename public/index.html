@@ -27,124 +27,178 @@
   </div>
 
   <div class="container">
-    <!-- Header Section -->
+    <!-- Header Section - Top Navigation Bar -->
     <header class="header">
-      <div class="logo-section">
+      <div class="header-left">
         <div class="logo">
           <i class="fas fa-cloud"></i>
           <span class="company-name">Saasworx</span>
         </div>
         <div class="app-title">
           <h1>Salesforce Org Analyzer</h1>
-          <p>Auto-fetch metadata & analyze code quality of your Salesforce org</p>
         </div>
       </div>
-      <div class="made-by">
-        <span>Made by <strong>Satyam Krishna</strong></span>
+      <div class="header-right">
+        <span class="made-by">Made by <strong>Satyam Krishna</strong></span>
+        <!-- Placeholder for user profile or settings, mimicking the inspiration -->
+        <div class="user-profile">
+          <i class="fas fa-user-circle"></i>
+        </div>
       </div>
     </header>
 
     <main class="main-content">
       <!-- Environment Selection Screen - Initially active -->
       <div class="screen active" id="environmentScreen">
-        <div class="screen-content">
-          <div class="welcome-section">
-            <h2>Select Salesforce Environment</h2>
-            <p>Choose your Salesforce environment to get started with the analysis</p>
-          </div>
+        <div class="screen-layout">
+          <!-- Left Sidebar for filters/navigation -->
+          <aside class="sidebar">
+            <h2 class="sidebar-title">Environments</h2>
+            <ul class="sidebar-nav">
+              <li class="nav-item active" onclick="selectEnvironment('production')">
+                <i class="fas fa-building"></i> Production
+              </li>
+              <li class="nav-item" onclick="selectEnvironment('sandbox')">
+                <i class="fas fa-flask"></i> Sandbox
+              </li>
+              <li class="nav-item test-login-nav" onclick="loginHardcoded()">
+                <i class="fas fa-key"></i> Test Login
+              </li>
+            </ul>
+            <p class="sidebar-description">Choose your Salesforce environment to get started with the analysis or use
+              test credentials.</p>
+          </aside>
 
-          <div class="environment-grid">
-            <!-- Production Environment Card -->
-            <div class="env-card" onclick="selectEnvironment('production')">
-              <div class="env-icon production">
-                <i class="fas fa-building"></i>
+          <!-- Main content area for environment cards -->
+          <div class="content-area">
+            <div class="welcome-section">
+              <h2>Select Salesforce Environment</h2>
+              <p>Choose your Salesforce environment to get started with the analysis</p>
+            </div>
+
+            <div class="environment-grid">
+              <!-- Production Environment Card -->
+              <div class="env-card" onclick="selectEnvironment('production')">
+                <div class="env-icon production">
+                  <i class="fas fa-building"></i>
+                </div>
+                <div class="env-details">
+                  <h3>Production</h3>
+                  <p>Live production environment</p>
+                </div>
+                <div class="status-badge coming-soon">Coming Soon</div>
               </div>
-              <h3>Production</h3>
-              <p>Live production environment</p>
-              <div class="status-badge coming-soon">Coming Soon</div>
-            </div>
 
-            <!-- Sandbox Environment Card -->
-            <div class="env-card" onclick="selectEnvironment('sandbox')">
-              <div class="env-icon sandbox">
-                <i class="fas fa-flask"></i>
+              <!-- Sandbox Environment Card -->
+              <div class="env-card" onclick="selectEnvironment('sandbox')">
+                <div class="env-icon sandbox">
+                  <i class="fas fa-flask"></i>
+                </div>
+                <div class="env-details">
+                  <h3>Sandbox</h3>
+                  <p>Development/testing environment</p>
+                </div>
+                <div class="status-badge coming-soon">Coming Soon</div>
               </div>
-              <h3>Sandbox</h3>
-              <p>Development/testing environment</p>
-              <div class="status-badge coming-soon">Coming Soon</div>
             </div>
-          </div>
 
-          <div class="test-section">
-            <div class="divider">
-              <span>OR</span>
+            <div class="test-section">
+              <div class="divider">
+                <span>OR</span>
+              </div>
+              <button class="btn btn-primary btn-large" onclick="loginHardcoded()">
+                <i class="fas fa-key"></i>
+                Test Login
+              </button>
+              <p class="test-description">Use test credentials to explore the analyzer</p>
             </div>
-            <button class="btn btn-primary btn-large" onclick="loginHardcoded()">
-              <i class="fas fa-key"></i>
-              Test Login
-            </button>
-            <p class="test-description">Use test credentials to explore the analyzer</p>
           </div>
         </div>
       </div>
 
       <!-- Main Dashboard Screen -->
       <div class="screen" id="dashboardScreen">
-        <div class="screen-content">
-          <div class="dashboard-header">
-            <h2>Salesforce Org Analyzer Dashboard</h2>
-            <div class="org-info" id="orgInfo"></div>
-          </div>
+        <div class="screen-layout">
+          <!-- Left Sidebar for Dashboard Navigation -->
+          <aside class="sidebar">
+            <h2 class="sidebar-title">Dashboard</h2>
+            <ul class="sidebar-nav">
+              <li class="nav-item active" onclick="showScreen('dashboardScreen')">
+                <i class="fas fa-tachometer-alt"></i> Overview
+              </li>
+              <li class="nav-item" onclick="startCodeAnalysis()">
+                <i class="fas fa-code"></i> Code Analysis
+              </li>
+              <li class="nav-item disabled">
+                <i class="fas fa-database"></i> Schema Analysis
+              </li>
+              <li class="nav-item disabled">
+                <i class="fas fa-shield-alt"></i> Security Analysis
+              </li>
+              <li class="nav-item disabled">
+                <i class="fas fa-chart-line"></i> Performance
+              </li>
+            </ul>
+            <p class="sidebar-description">Explore various analysis features for your Salesforce Org.</p>
+          </aside>
 
-          <div class="features-grid">
-            <!-- Code Analyzer Feature Card -->
-            <div class="feature-card available" onclick="startCodeAnalysis()">
-              <div class="feature-icon">
-                <i class="fas fa-code"></i>
-              </div>
-              <div class="feature-content">
-                <h3>Code Analyzer</h3>
-                <p>Analyze your Apex code quality, identify issues, and get recommendations</p>
-                <div class="feature-status available">Available</div>
-              </div>
-              <div class="feature-arrow">
-                <i class="fas fa-arrow-right"></i>
-              </div>
+          <!-- Main content area for dashboard features -->
+          <div class="content-area">
+            <div class="dashboard-header">
+              <h2>Salesforce Org Analyzer Dashboard</h2>
+              <div class="org-info" id="orgInfo"></div>
             </div>
 
-            <!-- Schema Analyzer Feature Card (Disabled) -->
-            <div class="feature-card disabled">
-              <div class="feature-icon">
-                <i class="fas fa-database"></i>
+            <div class="features-grid">
+              <!-- Code Analyzer Feature Card -->
+              <div class="feature-card available" onclick="startCodeAnalysis()">
+                <div class="feature-icon">
+                  <i class="fas fa-code"></i>
+                </div>
+                <div class="feature-content">
+                  <h3>Code Analyzer</h3>
+                  <p>Analyze your Apex code quality, identify issues, and get recommendations</p>
+                  <div class="feature-status available">Available</div>
+                </div>
+                <div class="feature-arrow">
+                  <i class="fas fa-arrow-right"></i>
+                </div>
               </div>
-              <div class="feature-content">
-                <h3>Schema Analyzer</h3>
-                <p>Analyze your data model, relationships, and schema complexity</p>
-                <div class="feature-status coming-soon">Coming Soon</div>
-              </div>
-            </div>
 
-            <!-- Security Analyzer Feature Card (Disabled) -->
-            <div class="feature-card disabled">
-              <div class="feature-icon">
-                <i class="fas fa-shield-alt"></i>
+              <!-- Schema Analyzer Feature Card (Disabled) -->
+              <div class="feature-card disabled">
+                <div class="feature-icon">
+                  <i class="fas fa-database"></i>
+                </div>
+                <div class="feature-content">
+                  <h3>Schema Analyzer</h3>
+                  <p>Analyze your data model, relationships, and schema complexity</p>
+                  <div class="feature-status coming-soon">Coming Soon</div>
+                </div>
               </div>
-              <div class="feature-content">
-                <h3>Security Analyzer</h3>
-                <p>Review security settings, permissions, and compliance</p>
-                <div class="feature-status coming-soon">Coming Soon</div>
-              </div>
-            </div>
 
-            <!-- Performance Analyzer Feature Card (Disabled) -->
-            <div class="feature-card disabled">
-              <div class="feature-icon">
-                <i class="fas fa-tachometer-alt"></i>
+              <!-- Security Analyzer Feature Card (Disabled) -->
+              <div class="feature-card disabled">
+                <div class="feature-icon">
+                  <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="feature-content">
+                  <h3>Security Analyzer</h3>
+                  <p>Review security settings, permissions, and compliance</p>
+                  <div class="feature-status coming-soon">Coming Soon</div>
+                </div>
               </div>
-              <div class="feature-content">
-                <h3>Performance Analyzer</h3>
-                <p>Identify performance bottlenecks and optimization opportunities</p>
-                <div class="feature-status coming-soon">Coming Soon</div>
+
+              <!-- Performance Analyzer Feature Card (Disabled) -->
+              <div class="feature-card disabled">
+                <div class="feature-icon">
+                  <i class="fas fa-tachometer-alt"></i>
+                </div>
+                <div class="feature-content">
+                  <h3>Performance Analyzer</h3>
+                  <p>Identify performance bottlenecks and optimization opportunities</p>
+                  <div class="feature-status coming-soon">Coming Soon</div>
+                </div>
               </div>
             </div>
           </div>
@@ -153,41 +207,57 @@
 
       <!-- Analysis Screen -->
       <div class="screen" id="analysisScreen">
-        <div class="screen-content">
-          <div class="analysis-header">
-            <button class="btn btn-secondary btn-back" onclick="showScreen('dashboardScreen')">
-              <i class="fas fa-arrow-left"></i>
-              Back to Dashboard
-            </button>
-            <h2>Code Analysis</h2>
-          </div>
+        <div class="screen-layout">
+          <!-- Left Sidebar for Analysis Navigation -->
+          <aside class="sidebar">
+            <h2 class="sidebar-title">Analysis</h2>
+            <ul class="sidebar-nav">
+              <li class="nav-item" onclick="showScreen('dashboardScreen')">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+              </li>
+              <li class="nav-item active">
+                <i class="fas fa-code"></i> Code Analysis
+              </li>
+              <li class="nav-item disabled">
+                <i class="fas fa-file-alt"></i> Reports History
+              </li>
+            </ul>
+            <p class="sidebar-description">Manage and view your code analysis processes and reports.</p>
+          </aside>
 
-          <div class="analysis-progress">
-            <div class="progress-card">
-              <div class="progress-info">
-                <h3>Analysis Progress</h3>
-                <div class="progress-status" id="analysisStatus">Ready to start analysis</div>
+          <!-- Main content area for analysis progress and actions -->
+          <div class="content-area">
+            <div class="analysis-header">
+              <h2>Code Analysis</h2>
+            </div>
+
+            <div class="analysis-progress-section">
+              <div class="progress-card">
+                <div class="progress-info">
+                  <h3>Analysis Progress</h3>
+                  <div class="progress-status" id="analysisStatus">Ready to start analysis</div>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" id="progressFill"></div>
+                </div>
               </div>
-              <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
+
+              <div class="analysis-actions">
+                <button class="btn btn-primary btn-large" onclick="runFullScan()" id="scanButton">
+                  <i class="fas fa-play"></i>
+                  Start Code Analysis
+                </button>
               </div>
             </div>
-          </div>
 
-          <div class="analysis-actions">
-            <button class="btn btn-primary btn-large" onclick="runFullScan()" id="scanButton">
-              <i class="fas fa-play"></i>
-              Start Code Analysis
-            </button>
-          </div>
-
-          <div class="analysis-results hidden" id="analysisResults">
-            <div class="results-header">
-              <h3>Analysis Complete</h3>
-              <button class="btn btn-primary" onclick="viewReport(reportId)">
-                <i class="fas fa-file-alt"></i>
-                View Detailed Report
-              </button>
+            <div class="analysis-results hidden" id="analysisResults">
+              <div class="results-header">
+                <h3>Analysis Complete</h3>
+                <button class="btn btn-primary" onclick="viewReport(reportId)">
+                  <i class="fas fa-file-alt"></i>
+                  View Detailed Report
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -195,17 +265,33 @@
 
       <!-- Report Screen -->
       <div class="screen" id="reportScreen">
-        <div class="screen-content">
-          <div class="report-header">
-            <button class="btn btn-secondary btn-back" onclick="showScreen('analysisScreen')">
-              <i class="fas fa-arrow-left"></i>
-              Back to Analysis
-            </button>
-            <h2>Analysis Report</h2>
-          </div>
+        <div class="screen-layout">
+          <!-- Left Sidebar for Report Navigation -->
+          <aside class="sidebar">
+            <h2 class="sidebar-title">Report</h2>
+            <ul class="sidebar-nav">
+              <li class="nav-item" onclick="showScreen('analysisScreen')">
+                <i class="fas fa-arrow-left"></i> Back to Analysis
+              </li>
+              <li class="nav-item active">
+                <i class="fas fa-file-alt"></i> Current Report
+              </li>
+              <li class="nav-item disabled">
+                <i class="fas fa-history"></i> Report History
+              </li>
+            </ul>
+            <p class="sidebar-description">Review the detailed analysis report for your Salesforce Org.</p>
+          </aside>
 
-          <div class="report-container" id="reportContainer">
-            <!-- Report content will be loaded here, potentially an iframe -->
+          <!-- Main content area for the report -->
+          <div class="content-area">
+            <div class="report-header">
+              <h2>Analysis Report</h2>
+            </div>
+
+            <div class="report-container" id="reportContainer">
+              <!-- Report content will be loaded here, potentially an iframe -->
+            </div>
           </div>
         </div>
       </div>
