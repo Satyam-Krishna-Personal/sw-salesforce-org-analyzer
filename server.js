@@ -181,9 +181,21 @@ app.post('/api/analyze', async (req, res) => {
         if (!finalForceAppCheck) {
             throw new Error('❌ force-app directory still missing after retrieval. Metadata might be missing.');
         }
+        
+        const forceAppDefaultPath = path.join(forceAppPath, 'main', 'default');
         const metadataSizeBytes = await getDirectorySize(forceAppPath);
         const metadataSizeKB = (metadataSizeBytes / 1024).toFixed(2);
         console.log(`📊 Retrieved metadata size: ${metadataSizeKB} KB`);
+
+        const forceAppDefaultPathMetadataSizeBytes = await getDirectorySize(forceAppDefaultPath);
+        const forceAppDefaultPathMetadataSizeKB = (forceAppDefaultPathMetadataSizeBytes / 1024).toFixed(2);
+        console.log(`📊 force-app/main/default metadata size: ${forceAppDefaultPathMetadataSizeKB} KB`);
+        if (forceAppDefaultPathMetadataSizeKB < 1) {
+            throw new Error('❌ force-app/main/default directory is empty or too small. No metadata retrieved.');
+        }
+        console.log(`✅ force-app/main/default directory exists with size: ${forceAppDefaultPathMetadataSizeKB} KB`);
+        console.log(`📂 Metadata retrieved successfully at: ${forceAppPath}`)
+        console.log(`📂 Metadata retrieved successfully at: ${forceAppDefaultPath}`);
 
         // Step 7: Run code analyzer
         console.log('🧪 Running code scan on retrieved metadata...');
