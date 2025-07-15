@@ -83,6 +83,16 @@ app.post('/api/analyze', async (req, res) => {
     const reportPath = path.join(__dirname, 'reports', reportFile);
 
     try {
+
+        // Check if SF CLI is installed
+        console.log('🔍 Checking installed Salesforce plugins...');
+        try {
+            const pluginsOutput = await executeCommand(`sf plugins`, { cwd: projectPath });
+            console.log('📦 Installed SF Plugins:\n' + pluginsOutput);
+        } catch (pluginErr) {
+            console.error('⚠️ Failed to list SF plugins:', pluginErr.stderr || pluginErr.message || pluginErr);
+        }
+
         await fs.ensureDir(sessionPath);
         await fs.ensureDir(path.join(__dirname, 'reports'));
 
@@ -120,8 +130,14 @@ app.post('/api/analyze', async (req, res) => {
         // Step 5: Run scanner
         console.log('🧪 Running code scan...');
         const scanCmd = `sf scanner run --format html --outfile "${reportPath}" --target "${path.join('myapp', 'main', 'default')}"`;
-        await executeCommand(scanCmd, { cwd: projectPath });
-        console.log(`✅ Code scan complete. Report at: ${reportPath}`);
+        try {
+            const scanResult = await executeCommand(scanCmd, { cwd: projectPath });
+            console.log(`✅ Code scan complete. Report at: ${reportPath}`);
+            console.log(`🔎 Scanner output:\n${scanResult}`);
+        } catch (scanErr) {
+            console.error('❌ Scanner failed:', scanErr.stderr || scanErr.message || scanErr);
+            throw new Error(`Scanner failed: ${scanErr.stderr || scanErr.message || scanErr}`);
+        }
 
         // Save session
         activeSessions.set(sessionId, {
@@ -151,13 +167,13 @@ app.post('/api/analyze', async (req, res) => {
         } catch (cleanupErr) {
             console.error('Cleanup error:', cleanupErr);
         }
-
-        console.error('Analyzer failed:', err.message);
+        const message = err?.message || err?.stderr || 'Unknown analyzer error';
+        console.error('Analyzer failed:', message);
         res.status(500).json({
             success: false,
-            message: 'Analyzer failed: ' + (err.message || err),
-            error: err.message || err,
-            stderr: err.stderr || ''
+            message: 'Analyzer failed: ' + message,
+            error: err,
+            stderr: err?.stderr || ''
         });
     }
 });
