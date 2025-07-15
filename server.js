@@ -133,8 +133,7 @@ app.post('/api/analyze', async (req, res) => {
         try {
             console.log('🧪 Running code scan on retrieved metadata...');
             const scanCmd = `sf code-analyzer run \
-                            --rule-selector eslint:Recommended \
-                            --rule-selector pmd:Recommended \
+                            --rule-selector all \
                             --workspace . \
                             --target myapp/main/default \
                             --view detail \
@@ -179,7 +178,7 @@ app.post('/api/analyze', async (req, res) => {
             console.error('Cleanup error:', cleanupErr);
         }
         const message = err?.message || err?.stderr || 'Unknown analyzer error';
-        console.error('Analyzer failed:', message);
+        //console.error('Analyzer failed:', message);
         res.status(500).json({
             success: false,
             message: 'Analyzer failed: ' + message,

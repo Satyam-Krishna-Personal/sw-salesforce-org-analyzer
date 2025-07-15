@@ -5,13 +5,21 @@ FROM node:20.14.0-bullseye
 ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 ENV NODE_ENV=production
 
-# Install system dependencies
+# Install system dependencies including Python 3.10 for Flow engine
 RUN apt-get update && apt-get install -y \
     curl \
     git \
     unzip \
     bash \
     openjdk-11-jre-headless \
+    software-properties-common \
+    && add-apt-repository ppa:deadsnakes/ppa \
+    && apt-get update && apt-get install -y \
+        python3.10 \
+        python3.10-venv \
+        python3.10-dev \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.10 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Salesforce CLI globally
