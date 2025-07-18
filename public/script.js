@@ -104,7 +104,7 @@ function initiateSalesforceLogin(environment) {
   // IMPORTANT: This client_id must be associated with a Connected App in your Salesforce org.
   // The redirect_uri MUST be registered in that Connected App.
   // This client ID is from your server.js, ensure it matches your Connected App.
-  const clientId = '3MVG9Kr5_mB04D14K2.EqeEs2caOInea.MU8T_VinMrIqGISwHSjpVCdEbHPlulLBIN4CD3Xir9g9x9Jqk6NC';
+  const clientId = '3MVG9GCMQoQ6rpzTwn5H3LRC6PlIw9rpCAD.2sSqf1q5idEd0cT_n6xBo8AzNDgrKdIGrIqULwcCE4Lw7xJ1C';
   const redirectUri = window.location.origin + '/oauth/callback'; 
 
   const state = btoa(JSON.stringify({ env: environment, originalPath: window.location.pathname })); // Encode state for security
